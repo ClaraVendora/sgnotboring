@@ -1,0 +1,44 @@
+# Local development: API + web with hot reload.
+# Supabase runs separately via the Supabase CLI (also Docker): `npm run db:start`.
+#
+#   docker compose up --build      # first run / after dependency changes
+#   docker compose up              # subsequent runs
+#   docker compose down            # stop
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    ports:
+      - "3001:3001"
+    env_file:
+      - apps/api/.env
+    environment:
+      HOST: 0.0.0.0
+      # Reach the host machine's Supabase from inside the container
+      SUPABASE_URL: http://host.docker.internal:54321
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - apps/web/.env
+    environment:
+      DOCKER: "true"
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/index.html:/app/apps/web/index.html
+      - ./apps/web/vite.config.js:/app/apps/web/vite.config.js
+      - ./apps/web/public:/app/apps/web/public
+    depends_on:
+      - api

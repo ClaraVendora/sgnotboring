@@ -5,11 +5,15 @@ import healthRoutes from './routes/health.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
 const HOST = process.env.HOST ?? '0.0.0.0'
-const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3000'
+// Comma-separated list, e.g. "http://localhost:3000,https://web-staging.up.railway.app"
+const WEB_ORIGINS = (process.env.WEB_ORIGIN ?? 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
 
 const app = Fastify({ logger: true })
 
-await app.register(cors, { origin: WEB_ORIGIN })
+await app.register(cors, { origin: WEB_ORIGINS })
 await app.register(healthRoutes)
 
 try {

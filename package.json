@@ -8,14 +8,24 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:api": "npm run dev -w api",
+    "dev:web": "npm run dev -w web",
     "build": "turbo run build",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:migrate": "supabase migration new"
   },
   "engines": {
     "node": ">=18"
   },
   "packageManager": "npm@11.4.2",
   "devDependencies": {
+    "supabase": "^2.117.0",
     "turbo": "^2.10.12"
   }
 }

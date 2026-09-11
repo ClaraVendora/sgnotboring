@@ -1,4 +1,4 @@
-# sgnotboring — Singapore Discovery Hub (MVP)
+# sgnotboring — Singapore Discovery Hub
 
 A centralized discovery hub for young Singaporeans: high-confidence, AI-curated
 details for local food and experiences, so you don't have to cross-reference five apps.
@@ -103,22 +103,6 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
 3. `main` accepts **exactly one kind of PR: `staging` → `main`**. CI (`guard-main` job) fails any other PR into `main`.
 4. Merging to `staging` auto-deploys to the Railway *staging* environment. Merging to `main` auto-deploys to *production*.
 5. Hotfixes follow the same path: branch → `staging` → `main`. No exceptions.
-
-**Recommended GitHub branch protection** (Settings → Branches), for both `staging` and `main`:
-require a PR, require the `CI` checks to pass, block force-pushes, and on `main` additionally
-require at least 1 approval. With `gh`:
-
-```bash
-for b in main staging; do
-  gh api -X PUT repos/{owner}/{repo}/branches/$b/protection \
-    -f required_status_checks[strict]=true \
-    -f 'required_status_checks[contexts][]=Install, lint, build' \
-    -f 'required_status_checks[contexts][]=Docker images build' \
-    -f enforce_admins=true \
-    -f required_pull_request_reviews[required_approving_review_count]=1 \
-    -F restrictions=null -F allow_force_pushes=false -F allow_deletions=false
-done
-```
 
 ---
 

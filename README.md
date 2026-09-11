@@ -71,7 +71,8 @@ npm run db:migrate <name>   # create supabase/migrations/<ts>_<name>.sql
 
 - Schema lives in `supabase/migrations/` — **every DB change is a migration**, never a manual edit in Studio.
 - `supabase/seed.sql` loads sample places for local dev only.
-- Push migrations to a hosted project with `npx supabase db push` after `npx supabase link --project-ref <ref>`.
+- Push migrations to a hosted project with `npm run db:push:staging` or `npm run db:push:prod`
+  (links to the right project, then pushes; asks for the project's DB password the first time).
 
 ### All commands
 
@@ -82,6 +83,7 @@ npm run db:migrate <name>   # create supabase/migrations/<ts>_<name>.sql
 | `npm run lint` | oxlint on the web app |
 | `npm run docker:up` / `docker:down` | local containers |
 | `npm run db:*` | local Supabase (see above) |
+| `npm run db:push:staging` / `db:push:prod` | apply migrations to a hosted project |
 
 ---
 
@@ -157,9 +159,17 @@ Each app has its own `railway.json` that tells Railway which Dockerfile to use a
    ```
    `PORT` is injected by Railway automatically; both images listen on it.
 
-5. **Supabase.** Use **two hosted Supabase projects**, one per environment (staging / prod), and point
-   each Railway environment at its own. Apply migrations with `npx supabase link` + `npx supabase db push`
-   (do this for staging when a PR merges to `staging`, and for prod when `staging` → `main` merges).
+5. **Supabase.** One hosted project per environment, plus the local CLI instance for development:
+
+   | Environment | Supabase project | Ref | Region |
+   |---|---|---|---|
+   | local | Supabase CLI in Docker (`npm run db:start`) | — | your laptop |
+   | staging | `sg-not-boring-staging` | `pyaqltngppzgcodojita` | Northeast Asia (Seoul) |
+   | production | `sg-not-boring` | `pnzjujwgvycdriwomwew` | Oceania (Sydney) |
+
+   Point each Railway environment at its own project's URL and keys. Apply migrations with
+   `npm run db:push:staging` when a PR merges to `staging`, and `npm run db:push:prod` when
+   `staging` → `main` merges. Nobody develops against staging or production directly.
 
 6. Health checks are pre-configured (`/health` on both services) so a bad deploy never replaces a good one.
 

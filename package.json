@@ -1,0 +1,21 @@
+{
+  "name": "sgnotboring",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Singapore Discovery Hub (MVP) — AI-curated food & experiences for young Singaporeans",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "npm@11.4.2",
+  "devDependencies": {
+    "turbo": "^2.10.12"
+  }
+}

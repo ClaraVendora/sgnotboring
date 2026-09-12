@@ -23,7 +23,7 @@
     "db:push:prod": "supabase link --project-ref pnzjujwgvycdriwomwew && supabase db push"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "packageManager": "npm@11.4.2",
   "devDependencies": {

@@ -9,7 +9,7 @@
     "start": "node src/server.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

@@ -13,7 +13,7 @@ Supabase (Postgres + Auth) · Docker · Railway.
 
 | Tool | Version | Notes |
 |------|---------|-------|
-| Node | 22 (18+ works) | `node -v` |
+| Node | 22 | `node -v` (Vite 8 needs 20.19+; `.node-version` pins 22) |
 | npm | 10+ | ships with Node |
 | Docker Desktop | any recent | needed for containers **and** for local Supabase |
 

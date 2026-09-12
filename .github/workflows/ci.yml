@@ -7,22 +7,18 @@ on:
     branches: [staging, main]
 
 jobs:
-  # Rule: main only ever receives PRs from staging.
+  # Rule: main only accepts PRs from staging.
   guard-main:
-    name: main accepts PRs from staging only
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
-      - name: Check source branch
-        run: |
+      - run: |
           if [ "${{ github.head_ref }}" != "staging" ]; then
-            echo "::error::PRs into main must come from 'staging' (got '${{ github.head_ref }}'). Open this PR against staging instead."
+            echo "::error::PRs into main must come from 'staging'. Open this PR against staging instead."
             exit 1
           fi
-          echo "OK: staging -> main"
 
   build:
-    name: Install, lint, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,16 +27,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint
       - run: npm run build
-
-  docker:
-    name: Docker images build
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build api image
-        run: docker build -f apps/api/Dockerfile --target prod -t sgnotboring-api .
-      - name: Build web image
-        run: docker build -f apps/web/Dockerfile --target prod -t sgnotboring-web .

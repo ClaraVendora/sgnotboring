@@ -1,7 +1,16 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home.jsx'
+import PlaceDetail from './pages/PlaceDetail.jsx'
+import NotFound from './pages/NotFound.jsx'
 
-function App() {
-  return <Home />
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/places/:id" element={<PlaceDetail />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
-
-export default App

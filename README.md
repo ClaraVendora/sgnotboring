@@ -135,15 +135,16 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 ```
 apps/
   api/                  Fastify backend
-    src/routes/         API endpoints
+    src/routes/         health.js, places.js (GET /places, /places/:id, /tags)
     src/services/       Supabase / Google Places / LLM logic
     src/server.js       entry point
     Dockerfile          dev + prod stages
     railway.json
   web/                  React + Vite + Chakra UI
-    src/components/     Chakra UI components
-    src/pages/          views (Home/Search)
-    src/lib/            API client / utils
+    src/App.jsx         routes:  /  ·  /places/:id  ·  *
+    src/pages/          Home (tag filter via ?tags=), PlaceDetail, NotFound
+    src/components/     TagFilter, PlaceCard
+    src/lib/            api.js (API client), hours.js (open/closed from Google hours)
     Dockerfile          dev + build + nginx prod stages
     nginx/              SPA config, listens on $PORT
     railway.json
@@ -156,8 +157,21 @@ turbo.json              dev / build / lint pipelines
 .github/workflows/ci.yml   build check, main-branch guard
 ```
 
-## 7. Next up (core MVP)
+## 7. Routing
+
+Client-side only (React Router). nginx (prod) and Vite (dev) return `index.html` for every path;
+the router picks the screen in the browser.
+
+| Route | Screen | Notes |
+|---|---|---|
+| `/` | Home | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
+| `/places/:id` | PlaceDetail | one place |
+| `*` | NotFound | |
+
+Tag filtering matches places that have **any** of the selected tags (`overlaps` in `routes/places.js`; change to `contains` for all-of).
+
+## 8. Next up (core MVP)
 
 1. API: ingest script — Google Places → LLM tag generation → Supabase `places` insert
-2. API: `GET /places?tags=...` querying Supabase with tag filters
-3. Web: search bar + tag pills + card grid (name, rating, tags, open status)
+2. Web: free-text search box on Home (name / summary), alongside the tag pills
+3. Web: real open/closed status once ingest populates `opening_hours`

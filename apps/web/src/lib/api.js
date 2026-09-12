@@ -1,23 +1,18 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
-async function request(path, options = {}) {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+async function request(path) {
+  const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`)
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `API ${res.status}`)
   }
   return res.json()
 }
 
-export function getHealth() {
-  return request('/health')
-}
-
+export const getHealth = () => request('/health')
+export const getTags = () => request('/tags')
+export const getPlace = (id) => request(`/places/${id}`)
 export function getPlaces(tags = []) {
-  const params = new URLSearchParams()
-  if (tags.length) params.set('tags', tags.join(','))
-  const qs = params.toString()
-  return request(`/places${qs ? `?${qs}` : ''}`)
+  const qs = tags.length ? `?tags=${encodeURIComponent(tags.join(','))}` : ''
+  return request(`/places${qs}`)
 }

@@ -184,7 +184,7 @@ supabase/
   seed.sql              local sample data
 docker-compose.yml      local dev containers
 turbo.json              dev / build / lint pipelines
-.github/workflows/ci.yml   build + docker checks, main-branch guard
+.github/workflows/ci.yml   build check, main-branch guard
 ```
 
 ## 7. Next up (core MVP)

@@ -28,3 +28,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  # On merge: apply supabase/migrations to the hosted project for that branch.
+  # staging -> sg-not-boring-staging, main -> sg-not-boring (production).
+  migrate:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency: migrate-${{ github.ref }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ github.ref_name == 'main' && secrets.SUPABASE_DB_PASSWORD_PROD || secrets.SUPABASE_DB_PASSWORD_STAGING }}
+      PROJECT_REF: ${{ github.ref_name == 'main' && 'pnzjujwgvycdriwomwew' || 'pyaqltngppzgcodojita' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - run: supabase link --project-ref "$PROJECT_REF"
+      - run: supabase db push --yes

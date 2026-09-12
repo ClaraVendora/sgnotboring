@@ -71,8 +71,7 @@ npm run db:migrate <name>   # create supabase/migrations/<ts>_<name>.sql
 
 - Schema lives in `supabase/migrations/` — **every DB change is a migration**, never a manual edit in Studio.
 - `supabase/seed.sql` loads sample places for local dev only.
-- Push migrations to a hosted project with `npm run db:push:staging` or `npm run db:push:prod`
-  (links to the right project, then pushes; asks for the project's DB password the first time).
+- Hosted projects get migrations from CI on merge (see §5). `npm run db:push:staging` / `db:push:prod` is the manual fallback.
 
 ### All commands
 
@@ -128,7 +127,11 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 - `WEB_ORIGIN` and `VITE_API_URL` reference the other service's domain (`${{web.RAILWAY_PUBLIC_DOMAIN}}` / `${{api.RAILWAY_PUBLIC_DOMAIN}}`).
   If the web page reports a CORS error after a fresh setup, redeploy `api` so the reference re-resolves.
 - Adding a new env var: put it in `.env.example`, then in Railway for **both** environments.
-- Schema changes reach hosted DBs via `npm run db:push:staging` / `db:push:prod`, not automatically.
+- Migrations are applied **automatically by CI** on every push to `staging` / `main` (the `migrate` job,
+  after `build` passes). It needs three repo secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD_STAGING`,
+  `SUPABASE_DB_PASSWORD_PROD`. `npm run db:push:*` remains as a manual fallback.
+- Migrations are forward-only. Test with `npm run db:reset` locally, let them soak on staging, and keep them
+  additive (add now, drop later) since Railway deploys the app in parallel with the migration.
 
 ## 6. Repo layout
 
@@ -154,7 +157,7 @@ supabase/
   seed.sql              local sample data
 docker-compose.yml      local dev containers
 turbo.json              dev / build / lint pipelines
-.github/workflows/ci.yml   build check, main-branch guard
+.github/workflows/ci.yml   build check, main-branch guard, DB migrate on merge
 ```
 
 ## 7. Routing

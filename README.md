@@ -100,63 +100,35 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
 
 1. **Never push or merge directly to `main`.** Everything goes through a PR.
 2. Feature / fix branches open PRs **against `staging`** only.
-3. `main` accepts **exactly one kind of PR: `staging` → `main`**. CI (`guard-main` job) fails any other PR into `main`.
-4. Merging to `staging` auto-deploys to the Railway *staging* environment. Merging to `main` auto-deploys to *production*.
+3. `main` accepts **exactly one kind of PR: `staging` → `main`**. CI's `guard-main` job goes red on any other PR into `main`. Don't merge on a red check.
+4. Merging to `staging` auto-deploys the Railway *staging* environment. Merging to `main` auto-deploys *production*.
 5. Hotfixes follow the same path: branch → `staging` → `main`. No exceptions.
-
-**Enforcement:** CI's `guard-main` job goes red on any PR into `main` that doesn't come from `staging`. Don't merge on a red check.
 
 ---
 
-## 5. Railway setup (one-time)
+## 5. Environments
 
-Both apps ship as Docker images built from the **repo root**. Each app's `railway.json` tells Railway
-which Dockerfile to use, the `/health` check, and which paths trigger a rebuild. We use Railway's
-generated `*.up.railway.app` domains, no custom domain.
+| | Branch | Web | API | Supabase project |
+|---|---|---|---|---|
+| **local** | any | http://localhost:3000 | http://localhost:3001 | CLI in Docker (`npm run db:start`) |
+| **staging** | `staging` | Railway → `staging` env → `web` | Railway → `staging` env → `api` | `sg-not-boring-staging` (`pyaqltngppzgcodojita`) |
+| **production** | `main` | https://web-production-543a7.up.railway.app | https://api-production-71f5.up.railway.app | `sg-not-boring` (`pnzjujwgvycdriwomwew`) |
 
-**A. Production environment (deploys `main`)**
+Both apps deploy to Railway as Docker images built from the repo root; each app's `railway.json`
+sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generated domains are used, no custom domain.
 
-1. railway.com → **New Project → Deploy from GitHub repo** → pick `ClaraVendora/sgnotboring`
-   (first time: install the Railway GitHub app and grant it this repo).
-2. The service it creates becomes the API. Rename it **`api`**, then in its Settings:
-   - Source → Branch: `main`. Root directory: leave as `/`.
-   - Build → Railway Config File: `apps/api/railway.json`.
-   - Networking → **Generate Domain**. If asked for a port, enter `3001`.
-3. **+ New → GitHub Repo** → same repo again. Rename it **`web`**. Same settings, but
-   config file `apps/web/railway.json` and port `3000`.
-4. Variables (service → Variables tab → Raw Editor is fastest). `${{...}}` are Railway references
-   and resolve automatically once both domains exist.
+**Variables** live in Railway per service and per environment:
 
-   `api`
-   ```
-   PORT=3001
-   WEB_ORIGIN=https://${{web.RAILWAY_PUBLIC_DOMAIN}}
-   SUPABASE_URL=https://pnzjujwgvycdriwomwew.supabase.co
-   SUPABASE_ANON_KEY=<prod anon key>
-   SUPABASE_SERVICE_ROLE_KEY=<prod service_role key>
-   ```
-   `web` (build-time: Vite bakes these in, so changing them requires a redeploy)
-   ```
-   PORT=3000
-   VITE_API_URL=https://${{api.RAILWAY_PUBLIC_DOMAIN}}
-   VITE_SUPABASE_URL=https://pnzjujwgvycdriwomwew.supabase.co
-   VITE_SUPABASE_ANON_KEY=<prod anon key>
-   ```
-   Keys come from the Supabase dashboard → Project Settings → API.
-5. Deploy both (they usually auto-deploy on save). Check `https://<api-domain>/health` returns
-   `{"status":"ok"}` and `https://<web-domain>` shows *API status: ok*.
+- `api`: `PORT`, `WEB_ORIGIN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `web`: `PORT`, `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 
-**B. Staging environment (deploys `staging`)**
+**Gotchas**
 
-1. Project → Settings → **Environments → New Environment** → name `staging`, duplicate from `production`.
-2. Switch to the `staging` environment (top-left switcher). For **each** service:
-   - Settings → Source → Branch: `staging`.
-   - Networking → Generate Domain (domains are not copied between environments).
-   - Variables → swap the three Supabase values for the staging project
-     (`https://pyaqltngppzgcodojita.supabase.co` + its keys). The `${{...}}` references stay as-is.
-3. Redeploy both and run the same two checks.
-
-From now on: merge to `staging` → staging URLs update; merge `staging` → `main` → production updates.
+- `VITE_*` values are baked in at **build** time. After changing one, redeploy `web`.
+- `WEB_ORIGIN` and `VITE_API_URL` reference the other service's domain (`${{web.RAILWAY_PUBLIC_DOMAIN}}` / `${{api.RAILWAY_PUBLIC_DOMAIN}}`).
+  If the web page reports a CORS error after a fresh setup, redeploy `api` so the reference re-resolves.
+- Adding a new env var: put it in `.env.example`, then in Railway for **both** environments.
+- Schema changes reach hosted DBs via `npm run db:push:staging` / `db:push:prod`, not automatically.
 
 ## 6. Repo layout
 

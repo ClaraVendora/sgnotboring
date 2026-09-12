@@ -104,6 +104,14 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
 4. Merging to `staging` auto-deploys to the Railway *staging* environment. Merging to `main` auto-deploys to *production*.
 5. Hotfixes follow the same path: branch → `staging` → `main`. No exceptions.
 
+**How this is enforced.** GitHub branch protection isn't available on this private repo (free plan),
+so the rule is held up by two guards plus discipline:
+
+- A **pre-push hook** (`.githooks/pre-push`, installed automatically by `npm install`) refuses any
+  `git push` to `main` from your machine. Don't bypass it with `--no-verify`.
+- The **CI `guard-main` job** fails on any PR into `main` whose source branch isn't `staging`.
+  Don't merge a PR with a red check.
+
 ---
 
 ## 5. Railway setup (one-time)

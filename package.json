@@ -20,7 +20,8 @@
     "db:reset": "supabase db reset",
     "db:migrate": "supabase migration new",
     "db:push:staging": "supabase link --project-ref pyaqltngppzgcodojita && supabase db push",
-    "db:push:prod": "supabase link --project-ref pnzjujwgvycdriwomwew && supabase db push"
+    "db:push:prod": "supabase link --project-ref pnzjujwgvycdriwomwew && supabase db push",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "engines": {
     "node": ">=18"

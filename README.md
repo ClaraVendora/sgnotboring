@@ -37,6 +37,15 @@ npm run db:start                         # boots local Supabase in Docker (first
 
 Run `npm run db:status` any time to see them again. Studio (DB GUI) is at http://127.0.0.1:54323.
 
+For the Ask tab, also set `GEMINI_API_KEY` in `apps/api/.env` (free key from
+[Google AI Studio](https://aistudio.google.com/apikey)), then tag the seed places once:
+
+```bash
+npm run enrich -w api    # LLM-tags every pending place (~7 Gemini calls for the seed data)
+```
+
+`npm run db:reset` wipes the tags, so re-run `enrich` after a reset.
+
 ## 3. Running locally
 
 ### Option A — plain Node (fastest feedback loop)
@@ -82,6 +91,7 @@ npm run db:migrate <name>   # create supabase/migrations/<ts>_<name>.sql
 | `npm run lint` | oxlint on the web app |
 | `npm run docker:up` / `docker:down` | local containers |
 | `npm run db:*` | local Supabase (see above) |
+| `npm run enrich -w api` | LLM-tag pending places (`-- --retag` re-tags all, `-- --dry-run` writes nothing) |
 | `npm run db:push:staging` / `db:push:prod` | apply migrations to a hosted project |
 
 ---
@@ -118,7 +128,9 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 
 **Variables** live in Railway per service and per environment:
 
-- `api`: `PORT`, `WEB_ORIGIN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `api`: `PORT`, `WEB_ORIGIN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `GEMINI_API_KEY`, `GEMINI_MODEL` (Gemini free-tier quota is per Google Cloud project, so give each
+  environment its own AI Studio project and key)
 - `web`: `PORT`, `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 
 **Gotchas**
@@ -138,23 +150,25 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 ```
 apps/
   api/                  Fastify backend
-    src/routes/         health.js, places.js (GET /places, /places/:id, /tags)
-    src/services/       Supabase / Google Places / LLM logic
+    src/routes/         health.js, places.js (GET /places, /places/:id, /tags), ask.js (POST /ask)
+    src/services/       supabase.js, llm.js (Gemini), tags.js (tag vocabulary)
+    src/prompts/        LLM system prompts + JSON schemas (tagging, /ask interpret + rank)
+    src/scripts/        enrich.js (LLM tagging job)
     src/server.js       entry point
     Dockerfile          dev + prod stages
     railway.json
   web/                  React + Vite + Chakra UI
-    src/App.jsx         routes:  /  ·  /places/:id  ·  *
-    src/pages/          Home (tag filter via ?tags=), PlaceDetail, NotFound
-    src/components/     TagFilter, PlaceCard
+    src/App.jsx         routes:  /  ·  /ask  ·  /places/:id  ·  *   + bottom tab bar
+    src/pages/          Home (tag filter via ?tags=), Ask (chat search), PlaceDetail, NotFound
+    src/components/     BottomNav, TagFilter, PlaceCard, ChatBubble, AskComposer
     src/lib/            api.js (API client), hours.js (open/closed from Google hours)
     Dockerfile          dev + build + nginx prod stages
     nginx/              SPA config, listens on $PORT
     railway.json
 supabase/
   config.toml           local Supabase config
-  migrations/           schema (places table, tags GIN index, RLS)
-  seed.sql              local sample data
+  migrations/           schema (places, tags vocabulary, raw_places + normalize trigger, search_places())
+  seed.sql              local sample data: 64 places into raw_places
 docker-compose.yml      local dev containers
 turbo.json              dev / build / lint pipelines
 .github/workflows/ci.yml   build check, main-branch guard, DB migrate on merge
@@ -167,14 +181,31 @@ the router picks the screen in the browser.
 
 | Route | Screen | Notes |
 |---|---|---|
-| `/` | Home | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
+| `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
+| `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation is component state, not URL |
 | `/places/:id` | PlaceDetail | one place |
 | `*` | NotFound | |
 
 Tag filtering matches places that have **any** of the selected tags (`overlaps` in `routes/places.js`; change to `contains` for all-of).
 
-## 8. Next up (core MVP)
+## 8. How tagging and Ask work
 
-1. API: ingest script — Google Places → LLM tag generation → Supabase `places` insert
+```
+raw_places insert ──trigger──▶ places (name, hours, price, …)      status 'pending'
+npm run enrich -w api ──▶ Gemini (batches of 10) ──▶ places.tags + summary, status 'done'
+
+POST /ask { message, history }
+  1. Gemini "interpret" → must_tags (all required), want_tags (scored), count (default 3)
+  2. search_places() SQL function → up to 20 candidates; loosens filters if too few
+  3. Gemini "rank" → top `count` with a one-line reason each (falls back to search order on error)
+```
+
+- Tags come only from the `tags` table (65 tags in 10 facets incl. 20 areas). Both prompts pass them as a JSON
+  Schema `enum`, so the model can't invent tags. Change the vocabulary with a migration, then `enrich -- --retag`.
+- Budget, Late Night, Outdoor Seating and Pet Friendly are derived from Google's data in code (`prompts/tagging.js`), not by the LLM.
+- Default model is `gemini-3.1-flash-lite` (free tier). Each `/ask` costs 2 calls.
+
+## 9. Next up
+
+1. API: Google Places ingest script that upserts into `raw_places` (the trigger and `enrich` already handle the rest)
 2. Web: free-text search box on Home (name / summary), alongside the tag pills
-3. Web: real open/closed status once ingest populates `opening_hours`

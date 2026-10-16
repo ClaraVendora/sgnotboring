@@ -49,9 +49,10 @@ apps/api/src/
   server.js        Fastify instance, CORS, plugin registration. Add new route files here.
   routes/<resource>.js   one Fastify plugin per resource (places.js). Thin handlers: validate via
                    schema → call service → shape response. Errors: `reply.code(n).send({ error })`.
-  services/        outside-world clients (supabase.js, google-places.js, llm.js). No Fastify objects,
-                   so scripts can import them.
-  scripts/         runnable jobs: `node src/scripts/<name>.js` (ingest lives here).
+  services/        outside-world clients (supabase.js, llm.js = Gemini, tags.js = cached vocabulary).
+                   No Fastify objects, so scripts can import them.
+  prompts/         LLM system prompts + JSON schemas, pure functions (tagging.js, ask.js).
+  scripts/         runnable jobs: `node src/scripts/<name>.js` (enrich.js = LLM tagging; ingest goes here).
 
 supabase/migrations/   schema, forward-only, additive (add now, drop in a later PR).
 supabase/seed.sql      local sample data only.
@@ -70,4 +71,7 @@ supabase/seed.sql      local sample data only.
 - `VITE_*` values are baked at build time; changing one in Railway needs a `web` redeploy.
 - `WEB_ORIGIN` (api) must exactly equal the browser's origin, no trailing slash.
 - Tag filter is any-of (`overlaps`). `contains` would make it all-of.
-- `opening_hours` is raw Google JSON; `lib/hours.js` derives open/closed.
+- `opening_hours` is raw Google JSON; `lib/hours.js` derives open/closed from `periods` in SG time.
+- Data flows `raw_places` → (trigger) → `places`. Write raw payloads, never normalized columns, directly.
+- Tags must exist in the `tags` table (vocabulary changes are migrations). LLM output is enum-constrained to it.
+- Gemini free-tier quota is per Google Cloud project: separate AI Studio project/key per environment.

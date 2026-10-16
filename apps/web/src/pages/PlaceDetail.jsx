@@ -51,6 +51,11 @@ export default function PlaceDetail() {
           </Badge>
         </HStack>
         {place.address && <Text>{place.address}</Text>}
+        {place.google_maps_uri && (
+          <Link href={place.google_maps_uri} target="_blank" rel="noreferrer" colorPalette="teal" alignSelf="flex-start">
+            Open in Google Maps ↗
+          </Link>
+        )}
         {place.summary && <Text fontSize="lg">{place.summary}</Text>}
         <Wrap gap={1}>
           {place.tags.map((t) => (

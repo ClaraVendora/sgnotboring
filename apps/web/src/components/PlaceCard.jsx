@@ -14,12 +14,13 @@ export default function PlaceCard({ place, reason }) {
           </LinkOverlay>
         </Card.Title>
         <HStack gap={3} fontSize="sm" color="fg.muted">
-          {place.rating != null && <Text>★ {place.rating}</Text>}
-          {place.price_level != null && <Text>{'$'.repeat(place.price_level)}</Text>}
+          {place.rating != null && <Text>★ {place.rating} ({place.user_ratings_total ?? 0})</Text>}
+          {place.price_level != null && <Text>{place.price_level === 0 ? 'Free' : '$'.repeat(place.price_level)}</Text>}
           <Badge colorPalette={status.color} variant="subtle">
             {status.label}
           </Badge>
         </HStack>
+        {place.address && <Text fontSize="sm" color="fg.muted">{place.address}</Text>}
         {reason && (
           <Text fontSize="sm" fontWeight="medium" color="teal.fg">
             {reason}

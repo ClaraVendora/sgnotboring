@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { Box, Flex, Icon, Link, Text } from '@chakra-ui/react'
-import { LuCompass, LuSparkles } from 'react-icons/lu'
+import { LuCompass, LuSparkles, LuUserRound } from 'react-icons/lu'
 
 // Height of the bar itself; the iOS home-indicator inset is added on top of it.
 export const NAV_HEIGHT = '64px'
@@ -8,6 +8,7 @@ export const NAV_HEIGHT = '64px'
 const TABS = [
   { to: '/', label: 'Discover', icon: LuCompass, end: true },
   { to: '/ask', label: 'Ask', icon: LuSparkles },
+  { to: '/profile', label: 'Profile', icon: LuUserRound },
 ]
 
 // Mobile-first tab bar fixed to the bottom. NavLink marks the active tab with
@@ -16,6 +17,7 @@ export default function BottomNav() {
   return (
     <Box
       as="nav"
+      aria-label="Main navigation"
       position="fixed"
       bottom={0}
       insetX={0}

@@ -45,12 +45,18 @@ export default function PlaceDetail() {
               ★ {place.rating} ({place.user_ratings_total ?? 0})
             </Text>
           )}
-          {place.price_level != null && <Text>{'$'.repeat(place.price_level)}</Text>}
+          {place.price_level != null && <Text>{place.price_level === 0 ? 'Free' : '$'.repeat(place.price_level)}</Text>}
           <Badge colorPalette={status.color} variant="subtle">
             {status.label}
           </Badge>
         </HStack>
         {place.address && <Text>{place.address}</Text>}
+        {place.opening_hours?.weekdayDescriptions?.length > 0 && (
+          <Stack gap={1}>
+            <Heading size="md">Opening hours</Heading>
+            {place.opening_hours.weekdayDescriptions.map((day) => <Text key={day} fontSize="sm">{day}</Text>)}
+          </Stack>
+        )}
         {place.google_maps_uri && (
           <Link href={place.google_maps_uri} target="_blank" rel="noreferrer" colorPalette="teal" alignSelf="flex-start">
             Open in Google Maps ↗

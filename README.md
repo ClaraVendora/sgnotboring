@@ -159,7 +159,7 @@ apps/
     railway.json
   web/                  React + Vite + Chakra UI
     src/App.jsx         routes:  /  ·  /ask  ·  /places/:id  ·  *   + bottom tab bar
-    src/pages/          Home (tag filter via ?tags=), Ask (chat search), PlaceDetail, NotFound
+    src/pages/          Home (tag filter via ?tags=), Ask (chat search), Profile, PlaceDetail, NotFound
     src/components/     BottomNav, TagFilter, PlaceCard, ChatBubble, AskComposer
     src/lib/            api.js (API client), hours.js (open/closed from Google hours)
     Dockerfile          dev + build + nginx prod stages
@@ -183,12 +183,66 @@ the router picks the screen in the browser.
 |---|---|---|
 | `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
 | `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation is component state, not URL |
+| `/profile` | Profile (Profile tab) | editable display name, neighbourhood and bio, saved in this browser on this device |
 | `/places/:id` | PlaceDetail | one place |
 | `*` | NotFound | |
 
 Tag filtering matches places that have **any** of the selected tags (`overlaps` in `routes/places.js`; change to `contains` for all-of).
 
 ## 8. How tagging and Ask work
+
+### Import Google Maps places
+
+Set `SERPAPI_KEY` in `apps/api/.env` to your [SerpApi key](https://serpapi.com/manage-api-key).
+The importer uses [SerpApi's Google Maps search](https://serpapi.com/google-maps-api),
+not a Google Cloud Places API key. Keep this key server-side.
+
+```bash
+npm run ingest -w api -- --query "food places in Singapore" --limit 20
+# Other searches: --query "cafes in Bugis" or --query "things to do in Sentosa"
+# Larger import across categories, capped at six requests total:
+npm run ingest -w api -- --query "hawker food in Singapore" --query "restaurants in Singapore" --query "cafes in Singapore" --limit 120 --max-requests 6
+# Preview without database writes (still uses SerpApi search credits):
+npm run ingest -w api -- --query "cafes in Bugis" --limit 5 --dry-run
+```
+
+The default target is 20 unique Singapore places. Increase `--limit` (up to 1200)
+and repeat `--query` for broader coverage by category or neighbourhood. Queries are
+paged in turn, up to six pages per query. `--max-requests` caps the total number of
+SerpApi requests across all queries (default 6, maximum 60); each uncached request
+can use a search credit. The importer also stops at the target count, exhausted results
+or repeated pages, so the requested count is an upper bound. Completed pages are
+saved immediately, including when a later request fails or runs out of quota.
+It writes the common Places payload format into `raw_places`; the existing trigger updates
+`places`, so refresh the home page to display names, addresses, ratings and review counts.
+Details show a Google Maps link and weekly opening hours when supplied. Text price ranges
+are not converted into dollar tiers, and an old open/closed snapshot is not shown as live status.
+Repeated imports update the same place IDs and preserve existing AI tags and summaries.
+On an existing local database, apply pending repository migrations first with
+`npx supabase migration up --local`; no database reset is needed.
+
+For Docker users, run this command on the host with local dependencies installed (`npm install`).
+The host command uses `SUPABASE_URL=http://127.0.0.1:54321` from the API `.env`.
+The API containers keep using the host gateway configured in `docker-compose.yml`.
+
+New places display immediately without Gemini. To include them in tag filtering and Ask,
+set `GEMINI_API_KEY` separately, then run `npm run enrich -w api`.
+
+### Sharing with teammates
+
+`docker compose up --build` starts the web app and our Fastify API. Starting them or
+viewing places reads Supabase; it does **not** run the importer or call SerpApi.
+Only an explicit `npm run ingest -w api` command calls SerpApi, using the key in
+that person's `apps/api/.env`. The Ask feature calls Gemini separately.
+
+Local Supabase databases are separate on each computer: imported rows are not included
+in Git. Teammates can import into their own local database, or use a shared hosted
+Supabase database to see the same saved places. With the current Docker Compose config,
+`SUPABASE_URL` is explicitly overridden to local Supabase, so switching to a hosted
+database also requires updating that override. `.env` files are ignored by Git;
+teammates must configure their own environment files.
+
+### Enrichment and search
 
 ```
 raw_places insert ──trigger──▶ places (name, hours, price, …)      status 'pending'
@@ -207,5 +261,4 @@ POST /ask { message, history }
 
 ## 9. Next up
 
-1. API: Google Places ingest script that upserts into `raw_places` (the trigger and `enrich` already handle the rest)
-2. Web: free-text search box on Home (name / summary), alongside the tag pills
+1. Web: free-text search box on Home (name / summary), alongside the tag pills

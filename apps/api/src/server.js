@@ -4,6 +4,7 @@ import cors from '@fastify/cors'
 import healthRoutes from './routes/health.js'
 import placesRoutes from './routes/places.js'
 import askRoutes from './routes/ask.js'
+import meRoutes from './routes/me.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
 const HOST = process.env.HOST ?? '0.0.0.0'
@@ -19,6 +20,7 @@ await app.register(cors, { origin: WEB_ORIGINS })
 await app.register(healthRoutes)
 await app.register(placesRoutes)
 await app.register(askRoutes)
+await app.register(meRoutes)
 
 try {
   await app.listen({ port: PORT, host: HOST })

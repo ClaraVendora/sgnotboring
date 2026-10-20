@@ -1,0 +1,4 @@
+# Changes to CI, the merge gate or this file need an approving review from a maintainer
+# (staging/main rulesets: "Require review from Code Owners"). Keep in sync with
+# MAINTAINERS in .github/scripts/merge-gate.cjs.
+/.github/ @ClaraVendora @chuakailing2608

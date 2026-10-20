@@ -1,0 +1,39 @@
+name: Merge gate
+
+# Required check `merge-gate` on staging and main (repo rulesets). Rules: .github/scripts/merge-gate.cjs
+#
+# pull_request_target runs this file from the base branch, never the PR's copy, and no PR code runs.
+# pull_request_review re-checks after a review; it uses the PR's copy, which is why any change
+# under .github/ needs a code-owner review (.github/CODEOWNERS + "Require review from Code Owners").
+on:
+  pull_request_target:
+    branches: [staging, main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  merge-gate:
+    if: github.event.pull_request.base.ref == 'staging' || github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { evaluate } = require('./.github/scripts/merge-gate.cjs')
+            const pr = context.payload.pull_request
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              ...context.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            })
+            const { ok, reason } = evaluate({ pr, reviews, repo: `${context.repo.owner}/${context.repo.repo}` })
+            if (ok) core.info(reason)
+            else core.setFailed(reason)

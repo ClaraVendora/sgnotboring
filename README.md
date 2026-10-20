@@ -105,13 +105,17 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
                Railway "staging"   Railway "production"
 ```
 
-**Rules**
+**Rules** (GitHub rulesets on `staging` and `main` enforce these)
 
-1. **Never push or merge directly to `main`.** Everything goes through a PR.
+1. **No direct pushes, force pushes or deletions** on `staging` or `main`. Everything goes through a PR.
 2. Feature / fix branches open PRs **against `staging`** only.
-3. `main` accepts **exactly one kind of PR: `staging` → `main`**. CI's `guard-main` job goes red on any other PR into `main`. Don't merge on a red check.
-4. Merging to `staging` auto-deploys the Railway *staging* environment. Merging to `main` auto-deploys *production*.
-5. Hotfixes follow the same path: branch → `staging` → `main`. No exceptions.
+3. `main` accepts **exactly one kind of PR: `staging` → `main`**.
+4. **Maintainers are @ClaraVendora and @chuakailing2608.** The required `merge-gate` check passes only when a
+   maintainer opened the PR, or a maintainer approved its latest commit (new commits need a fresh approval).
+   Changes under `.github/` also need a maintainer's code-owner review.
+   Rules: `.github/scripts/merge-gate.cjs`; owners: `.github/CODEOWNERS`.
+5. Merging to `staging` auto-deploys the Railway *staging* environment. Merging to `main` auto-deploys *production*.
+6. Hotfixes follow the same path: branch → `staging` → `main`. No exceptions.
 
 ---
 
@@ -140,8 +144,9 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
   If the web page reports a CORS error after a fresh setup, redeploy `api` so the reference re-resolves.
 - Adding a new env var: put it in `.env.example`, then in Railway for **both** environments.
 - Migrations are applied **automatically by CI** on every push to `staging` / `main` (the `migrate` job,
-  after `build` passes). It needs three repo secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD_STAGING`,
-  `SUPABASE_DB_PASSWORD_PROD`. `npm run db:push:*` remains as a manual fallback.
+  after `build` passes). Its secrets, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, live in the GitHub
+  Environments `staging` and `production`, which only the `staging` and `main` branches can use.
+  `npm run db:push:*` remains as a manual fallback.
 - Migrations are forward-only. Test with `npm run db:reset` locally, let them soak on staging, and keep them
   additive (add now, drop later) since Railway deploys the app in parallel with the migration.
 
@@ -171,7 +176,8 @@ supabase/
   seed.sql              local sample data: 64 places into raw_places
 docker-compose.yml      local dev containers
 turbo.json              dev / build / lint pipelines
-.github/workflows/ci.yml   build check, main-branch guard, DB migrate on merge
+.github/workflows/ci.yml   build check, DB migrate on merge
+.github/workflows/merge-gate.yml   who may merge into staging/main (rules in .github/scripts/merge-gate.cjs)
 ```
 
 ## 7. Routing

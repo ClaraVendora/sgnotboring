@@ -15,4 +15,7 @@ Open a PR for the current branch into `staging`. Optional title override: `$ARGU
 6. **Title:** use `$ARGUMENTS` if given, else derive from the branch: `feat/42-tag-search` → `feat: tag search (#42)`.
 7. **Body:** fill `.github/pull_request_template.md`. Under *What*, 1–3 lines from the commits. Tick checklist items that are actually true. List any new env vars that must be added to Railway (both environments) and any migration files.
 8. **Create:** `gh pr create --base staging --title "<title>" --body-file <tmp>`. Never `--base main`.
-9. Report the PR URL and which CI checks will run (`build`, and `migrate` after merge if migrations changed).
+9. Report the PR URL and which CI checks will run (`build`, `merge-gate`, and `migrate` after merge if migrations changed).
+   If the author isn't a maintainer (@ClaraVendora, @chuakailing2608), request a review from them:
+   `gh pr edit <n> --add-reviewer ClaraVendora,chuakailing2608`. `merge-gate` stays red until one approves.
+   Never edit `.github/` to make it pass.

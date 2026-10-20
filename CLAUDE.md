@@ -27,6 +27,8 @@ npm run docker:up     # api + web in containers
 
 - Branch off `staging`: `feat|fix|chore/<ticket-><short-kebab-description>` (ticket number optional, e.g. `feat/42-tag-search`, `fix/cors-origin`).
 - PRs go **into `staging`**. `main` only ever receives `staging → main` PRs. Never push to `main`.
+- Only maintainers (@ClaraVendora, @chuakailing2608) decide merges: the required `merge-gate` check fails until
+  a maintainer opened the PR or approved its latest commit. Don't try to make it pass by editing `.github/`.
 - Commit subjects: `feat: …`, `fix: …`, `chore: …` — imperative, under 72 chars.
 - Merge to `staging` deploys Railway staging + runs migrations; `staging → main` does the same for production.
 

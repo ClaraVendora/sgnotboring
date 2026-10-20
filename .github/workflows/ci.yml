@@ -6,18 +6,8 @@ on:
   push:
     branches: [staging, main]
 
+# Who may merge (and the staging -> main only rule) lives in merge-gate.yml.
 jobs:
-  # Rule: main only accepts PRs from staging.
-  guard-main:
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          if [ "${{ github.head_ref }}" != "staging" ]; then
-            echo "::error::PRs into main must come from 'staging'. Open this PR against staging instead."
-            exit 1
-          fi
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -31,14 +21,16 @@ jobs:
 
   # On merge: apply supabase/migrations to the hosted project for that branch.
   # staging -> sg-not-boring-staging, main -> sg-not-boring (production).
+  # Secrets live in GitHub Environments that only their own branch can use.
   migrate:
     if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     concurrency: migrate-${{ github.ref }}
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ github.ref_name == 'main' && secrets.SUPABASE_DB_PASSWORD_PROD || secrets.SUPABASE_DB_PASSWORD_STAGING }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       PROJECT_REF: ${{ github.ref_name == 'main' && 'pnzjujwgvycdriwomwew' || 'pyaqltngppzgcodojita' }}
     steps:
       - uses: actions/checkout@v4

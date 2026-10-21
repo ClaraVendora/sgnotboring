@@ -50,8 +50,8 @@ ENG-03 is **not complete until both hosted projects are configured and verified*
 | Email provider | Enabled | Enabled |
 | Confirm email | Enabled | Enabled |
 | Minimum password length | 8 | 8 |
-| Site URL | Actual Railway staging **web** origin; currently unverified | `https://web-production-543a7.up.railway.app` (repository value; recheck against Railway) |
-| Additional redirect URL | The verified staging web origin plus `/auth/callback` | `https://web-production-543a7.up.railway.app/auth/callback` |
+| Site URL | `https://web-staging-678b.up.railway.app` | `https://web-production-543a7.up.railway.app` (repository value; recheck against Railway) |
+| Additional redirect URL | `https://web-staging-678b.up.railway.app/auth/callback` | `https://web-production-543a7.up.railway.app/auth/callback` |
 
 Dashboard links:
 

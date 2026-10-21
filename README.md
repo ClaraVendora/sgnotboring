@@ -124,7 +124,7 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
 | | Branch | Web | API | Supabase project |
 |---|---|---|---|---|
 | **local** | any | http://localhost:3000 | http://localhost:3001 | CLI in Docker (`npm run db:start`) |
-| **staging** | `staging` | Railway → `staging` env → `web` | Railway → `staging` env → `api` | `sg-not-boring-staging` (`pyaqltngppzgcodojita`) |
+| **staging** | `staging` | https://web-staging-678b.up.railway.app | Railway → `staging` env → `api` | `sg-not-boring-staging` (`pyaqltngppzgcodojita`) |
 | **production** | `main` | https://web-production-543a7.up.railway.app | https://api-production-71f5.up.railway.app | `sg-not-boring` (`pnzjujwgvycdriwomwew`) |
 
 Both apps deploy to Railway as Docker images built from the repo root; each app's `railway.json`

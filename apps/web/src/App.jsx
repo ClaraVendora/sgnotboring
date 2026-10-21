@@ -16,6 +16,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/ask" element={<Ask />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/auth/callback" element={<Profile />} />
           <Route path="/places/:id" element={<PlaceDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

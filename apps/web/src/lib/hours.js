@@ -1,14 +1,20 @@
 // Google Places opening_hours → { label, color }.
 // Places API (New) rows carry `periods` ({ open: { day, hour, minute }, close }, day 0 = Sunday),
-// so status is computed for right now in Singapore time. Older rows only have `open_now`,
-// a snapshot from ingest time.
+// Status always uses periods and Singapore time, never the ingest-time snapshot.
 const OPEN = { label: 'Open now', color: 'green' }
 const CLOSED = { label: 'Closed', color: 'red' }
 const UNKNOWN = { label: 'Hours unknown', color: 'gray' }
 
 const WEEK = 7 * 24 * 60
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const toMinutes = ({ day, hour, minute }) => day * 24 * 60 + hour * 60 + minute
+const validTime = (point) => point &&
+  Number.isInteger(point.day) && point.day >= 0 && point.day <= 6 &&
+  Number.isInteger(point.hour) && point.hour >= 0 && point.hour <= 23 &&
+  Number.isInteger(point.minute ?? 0) && (point.minute ?? 0) >= 0 && (point.minute ?? 0) <= 59
+const validPeriod = (period) => validTime(period?.open) &&
+  (period.close ? validTime(period.close) :
+    period.open.day === 0 && period.open.hour === 0 && (period.open.minute ?? 0) === 0)
+const toMinutes = ({ day, hour, minute = 0 }) => day * 24 * 60 + hour * 60 + minute
 
 const sgClock = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Singapore',
@@ -25,7 +31,7 @@ export function singaporeMinuteOfWeek(date = new Date()) {
 }
 
 export function isOpenAt(periods, minuteOfWeek) {
-  return periods.some(({ open, close }) => {
+  return Array.isArray(periods) && periods.filter(validPeriod).some(({ open, close }) => {
     if (!close) return true // a single period with no close = open 24 hours
     const start = toMinutes(open)
     let end = toMinutes(close)
@@ -35,9 +41,8 @@ export function isOpenAt(periods, minuteOfWeek) {
 }
 
 export function openStatus(openingHours, now = new Date()) {
-  if (Array.isArray(openingHours?.periods) && openingHours.periods.length) {
+  if (Array.isArray(openingHours?.periods) && openingHours.periods.length && openingHours.periods.every(validPeriod)) {
     return isOpenAt(openingHours.periods, singaporeMinuteOfWeek(now)) ? OPEN : CLOSED
   }
-  if (typeof openingHours?.open_now === 'boolean') return openingHours.open_now ? OPEN : CLOSED
   return UNKNOWN
 }

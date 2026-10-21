@@ -1,10 +1,10 @@
 import { Link as RouterLink } from 'react-router-dom'
 import { Badge, Card, HStack, LinkBox, LinkOverlay, Text, Wrap } from '@chakra-ui/react'
-import { openStatus } from '../lib/hours.js'
+import { useOpenStatus } from '../hooks/useOpenStatus.js'
 
 // `reason`: optional one-liner from /ask on why this place was picked.
 export default function PlaceCard({ place, reason }) {
-  const status = openStatus(place.opening_hours)
+  const status = useOpenStatus(place?.opening_hours)
   return (
     <LinkBox as={Card.Root} _hover={{ shadow: 'md' }} transition="box-shadow 0.15s">
       <Card.Body gap={2}>

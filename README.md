@@ -268,3 +268,35 @@ POST /ask { message, history }
 ## 9. Next up
 
 1. Web: free-text search box on Home (name / summary), alongside the tag pills
+
+### Browse and search (SGN-001 / SGN-002)
+
+`GET /places?q=bugis&tags=Cafe,Restaurant` returns tagged places, ordered by rating
+(highest first, unrated last), then name and ID. `q` is optional and limited to 100
+characters; invalid input returns HTTP 400. Search is a literal, case-insensitive
+substring of the name, address, or an assigned tag whose vocabulary facet is `area`.
+Selected tags match ANY tag, ANDed with the search text. Punctuation, `%`, and `_`
+are literal characters, not SQL wildcards or filter expressions.
+
+The home page debounces typing by 300 ms and keeps both `q` and `tags` in the URL.
+Clearing search preserves tags; clearing tags preserves search. Browser back/forward
+restores both. The result count describes the current displayed list.
+
+After pulling this change, apply the new migration to an existing **local** database
+without resetting its data:
+
+```sh
+npx supabase migration up --local
+```
+
+The browse RPC is separate from Ask's tag-ranking overload of `search_places`.
+Run the existing local enrichment command if seed rows have no tags yet; untagged
+rows are not shown on Browse and are not candidates for Ask. Hosted migrations
+remain the team's CI/maintainer responsibility.
+
+Opening badges (SGN-016) calculate from weekly periods in `Asia/Singapore`, with
+inclusive opening and exclusive closing boundaries, split shifts, week wrapping,
+and Google's 24/7 sentinel. Missing/invalid periods show `Hours unknown`; old
+`open_now` snapshots are ignored. Visible badges refresh when the minute changes
+and when returning to the tab. Detail pages distinguish HTTP 404 from other
+errors and discard stale requests when navigating between places (SGN-006).

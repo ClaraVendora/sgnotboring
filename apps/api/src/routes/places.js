@@ -1,7 +1,5 @@
 import { supabase } from '../services/supabase.js'
-
-const CARD_FIELDS =
-  'id, name, address, rating, user_ratings_total, price_level, tags, summary, opening_hours'
+import { searchPlaces } from '../services/places.js'
 
 export default async function placesRoutes(app) {
   // GET /places?tags=Late%20Night,Spicy  → places matching ANY of the tags
@@ -11,23 +9,21 @@ export default async function placesRoutes(app) {
       schema: {
         querystring: {
           type: 'object',
-          properties: { tags: { type: 'string', maxLength: 500 } },
+          properties: {
+            tags: { type: 'string', maxLength: 500 },
+            q: { type: 'string', maxLength: 100 },
+          },
           additionalProperties: false,
         },
       },
     },
     async (req, reply) => {
-      const tags = (req.query.tags ?? '')
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean)
-
-      let query = supabase.from('places').select(CARD_FIELDS).order('rating', { ascending: false })
-      if (tags.length) query = query.overlaps('tags', tags)
-
-      const { data, error } = await query
-      if (error) return reply.code(500).send({ error: error.message })
-      return data
+      try {
+        return await searchPlaces(req.query)
+      } catch (error) {
+        req.log.error(error, 'Could not search places')
+        return reply.code(500).send({ error: 'Could not load places' })
+      }
     },
   )
 

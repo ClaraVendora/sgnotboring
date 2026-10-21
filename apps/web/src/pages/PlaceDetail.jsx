@@ -2,21 +2,27 @@ import { useEffect, useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { Badge, Container, Heading, HStack, Link, Spinner, Stack, Text, Wrap } from '@chakra-ui/react'
 import { getPlace } from '../lib/api.js'
-import { openStatus } from '../lib/hours.js'
+import { useOpenStatus } from '../hooks/useOpenStatus.js'
 
 export default function PlaceDetail() {
   const { id } = useParams()
-  const [place, setPlace] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState({ id: null, place: null, error: null })
+  const { place, error } = result.id === id ? result : { place: null, error: null }
+  const status = useOpenStatus(place?.opening_hours)
 
   useEffect(() => {
-    getPlace(id).then(setPlace).catch((e) => setError(e.message))
+    let cancelled = false
+    getPlace(id)
+      .then((place) => !cancelled && setResult({ id, place, error: null }))
+      .catch((error) => !cancelled && setResult({ id, place: null, error }))
+    return () => { cancelled = true }
   }, [id])
 
   if (error) {
     return (
       <Container maxW="3xl" py={10}>
-        <Text color="fg.error">{error}</Text>
+        <Heading size="xl">{error.status === 404 ? 'Place not found' : 'Could not load this place'}</Heading>
+        <Text color="fg.error">{error.status === 404 ? 'This place may have been removed.' : error.message}</Text>
         <Link asChild mt={4} display="inline-block">
           <RouterLink to="/">← Back</RouterLink>
         </Link>
@@ -31,7 +37,6 @@ export default function PlaceDetail() {
     )
   }
 
-  const status = openStatus(place.opening_hours)
   return (
     <Container maxW="3xl" py={10}>
       <Stack gap={4}>

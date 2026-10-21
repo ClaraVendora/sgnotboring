@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Container, Heading, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
 import { getPlaces, getTags } from '../lib/api.js'
+import PlaceSearch from '../components/PlaceSearch.jsx'
 import TagFilter from '../components/TagFilter.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
 
@@ -12,29 +13,45 @@ export default function Home() {
   const selected = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
 
   const tagsKey = selected.join(',')
+  const q = searchParams.get('q') ?? ''
+  const resultKey = JSON.stringify([tagsKey, q])
+  const updateParam = useCallback((name, value) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous)
+      if (value) next.set(name, value)
+      else next.delete(name)
+      return next
+    })
+  }, [setSearchParams])
+  const search = useCallback((value) => updateParam('q', value), [updateParam])
 
   const [tags, setTags] = useState([])
+  const [tagsError, setTagsError] = useState(false)
   const [result, setResult] = useState({ key: null, places: null, error: null })
-  const loading = result.key !== tagsKey
+  const loading = result.key !== resultKey
   const { places, error } = loading ? { places: null, error: null } : result
 
   useEffect(() => {
-    getTags().then(setTags).catch(() => setTags([]))
+    let cancelled = false
+    getTags()
+      .then((data) => !cancelled && setTags(data))
+      .catch(() => !cancelled && setTagsError(true))
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     let cancelled = false
-    getPlaces(tagsKey.split(',').filter(Boolean))
-      .then((data) => !cancelled && setResult({ key: tagsKey, places: data, error: null }))
-      .catch((e) => !cancelled && setResult({ key: tagsKey, places: null, error: e.message }))
+    getPlaces(tagsKey.split(',').filter(Boolean), q)
+      .then((data) => !cancelled && setResult({ key: resultKey, places: data, error: null }))
+      .catch((e) => !cancelled && setResult({ key: resultKey, places: null, error: e.message }))
     return () => {
       cancelled = true
     }
-  }, [tagsKey])
+  }, [tagsKey, q, resultKey])
 
   const toggle = (tag) => {
     const next = selected.includes(tag) ? selected.filter((t) => t !== tag) : [...selected, tag]
-    setSearchParams(next.length ? { tags: next.join(',') } : {})
+    updateParam('tags', next.join(','))
   }
 
   return (
@@ -47,11 +64,16 @@ export default function Home() {
           </Text>
         </Stack>
 
-        <TagFilter tags={tags} selected={selected} onToggle={toggle} onClear={() => setSearchParams({})} />
+        <PlaceSearch value={q} onChange={search} />
+        {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
+        <TagFilter tags={tags} selected={selected} onToggle={toggle} onClear={() => updateParam('tags', '')} />
 
+        <Text role="status" aria-live="polite">
+          {loading ? 'Loading food places…' : places ? `${places.length} food places` : 'Could not load food places'}
+        </Text>
         {error && <Text color="fg.error">Couldn't load places: {error}</Text>}
         {loading && <Spinner />}
-        {places?.length === 0 && <Text color="fg.muted">Nothing matches those tags yet.</Text>}
+        {places?.length === 0 && <Text color="fg.muted">No food places match your search and filters.</Text>}
         {places?.length > 0 && (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
             {places.map((p) => (

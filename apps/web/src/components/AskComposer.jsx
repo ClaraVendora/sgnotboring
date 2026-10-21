@@ -14,6 +14,7 @@ export default function AskComposer({ value, onChange, onSubmit, disabled }) {
     <HStack as="form" onSubmit={submit} gap={2} align="flex-end">
       <Textarea
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) submit(e)

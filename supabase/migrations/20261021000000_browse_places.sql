@@ -1,6 +1,6 @@
 -- Literal, case-insensitive search; RPC parameters never become filter syntax.
 -- Keep the selected-tag OR group ANDed with the name/address/area search group.
-create or replace function public.search_places(search_text text default '', selected_tags text[] default '{}')
+create or replace function public.browse_places(search_text text default '', selected_tags text[] default '{}')
 returns setof public.places
 language sql stable security invoker
 set search_path = ''
@@ -20,5 +20,5 @@ as $$
     )
   order by p.rating desc nulls last, p.name, p.id;
 $$;
-revoke all on function public.search_places(text, text[]) from public;
-grant execute on function public.search_places(text, text[]) to anon, authenticated, service_role;
+revoke all on function public.browse_places(text, text[]) from public;
+grant execute on function public.browse_places(text, text[]) to anon, authenticated, service_role;

@@ -7,7 +7,8 @@ import TagFilter from '../components/TagFilter.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
 
 // Selected tags live in the URL (?tags=Late%20Night,Spicy) so filtered views are
-// shareable and the back button works.
+// shareable and the back button works. Search (?q=) replaces the current entry instead,
+// so each pause while typing doesn't cost a Back press.
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
   const selected = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
@@ -15,15 +16,15 @@ export default function Home() {
   const tagsKey = selected.join(',')
   const q = searchParams.get('q') ?? ''
   const resultKey = JSON.stringify([tagsKey, q])
-  const updateParam = useCallback((name, value) => {
+  const updateParam = useCallback((name, value, options) => {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous)
       if (value) next.set(name, value)
       else next.delete(name)
       return next
-    })
+    }, options)
   }, [setSearchParams])
-  const search = useCallback((value) => updateParam('q', value), [updateParam])
+  const search = useCallback((value) => updateParam('q', value, { replace: true }), [updateParam])
 
   const [tags, setTags] = useState([])
   const [tagsError, setTagsError] = useState(false)
@@ -69,11 +70,17 @@ export default function Home() {
         <TagFilter tags={tags} selected={selected} onToggle={toggle} onClear={() => updateParam('tags', '')} />
 
         <Text role="status" aria-live="polite">
-          {loading ? 'Loading food places…' : places ? `${places.length} food places` : 'Could not load food places'}
+          {loading
+            ? 'Loading food places…'
+            : places ? `${places.length} food ${places.length === 1 ? 'place' : 'places'}` : 'Could not load food places'}
         </Text>
         {error && <Text color="fg.error">Couldn't load places: {error}</Text>}
         {loading && <Spinner />}
-        {places?.length === 0 && <Text color="fg.muted">No food places match your search and filters.</Text>}
+        {places?.length === 0 && (
+          <Text color="fg.muted">
+            {q || selected.length ? 'No food places match your search and filters.' : 'No food places to show yet.'}
+          </Text>
+        )}
         {places?.length > 0 && (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
             {places.map((p) => (

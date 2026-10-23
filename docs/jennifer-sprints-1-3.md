@@ -30,9 +30,9 @@ Base: staging at b001581. Branch: feat/jennifer-sprints-1-3.
 
 ## Integration
 
-Apply `supabase/migrations/20261021000000_search_places.sql` before deploying the API.
-It adds a named-parameter overload; Ask continues using its existing must_tags /
-want_tags / max_results signature. No new environment variables are needed.
+Apply `supabase/migrations/20261021000000_browse_places.sql` before deploying the API.
+It adds `browse_places()`; Ask's `search_places()` is unchanged. No new environment
+variables are needed.
 Hosted database migrations and merges remain maintainer/CI actions.
 
 Sprint 4+ work (photos, quick filters, extended hours/actions, accounts, persistence)

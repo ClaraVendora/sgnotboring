@@ -59,10 +59,12 @@ export async function getAccount() {
   return request('/me', { headers: { Authorization: `Bearer ${data.session.access_token}` } })
 }
 export const getTags = () => request('/tags')
-export const getPlace = (id) => request(`/places/${id}`)
-export function getPlaces(tags = []) {
-  const qs = tags.length ? `?tags=${encodeURIComponent(tags.join(','))}` : ''
-  return request(`/places${qs}`)
+export const getPlace = (id) => request(`/places/${encodeURIComponent(id)}`)
+export function getPlaces(tags = [], q = '') {
+  const qs = new URLSearchParams()
+  if (tags.length) qs.set('tags', tags.join(','))
+  if (q.trim()) qs.set('q', q.trim())
+  return request(`/places?${qs}`)
 }
 // history: earlier turns [{ role: 'user' | 'assistant', text }] so follow-ups make sense
 export const askPlaces = (message, history = []) => postJson('/ask', { message, history })

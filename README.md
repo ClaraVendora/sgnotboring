@@ -173,7 +173,7 @@ apps/
     railway.json
 supabase/
   config.toml           local Supabase config
-  migrations/           schema (places, tags vocabulary, raw_places + normalize trigger, search_places())
+  migrations/           schema (places, tags vocabulary, raw_places + normalize trigger, search_places(), browse_places())
   seed.sql              local sample data: 64 places into raw_places
 docker-compose.yml      local dev containers
 turbo.json              dev / build / lint pipelines
@@ -275,6 +275,35 @@ POST /ask { message, history }
 - Budget, Late Night, Outdoor Seating and Pet Friendly are derived from Google's data in code (`prompts/tagging.js`), not by the LLM.
 - Default model is `gemini-3.1-flash-lite` (free tier). Each `/ask` costs 2 calls.
 
-## 9. Next up
+## 9. Browse and search (SGN-001 / SGN-002)
 
-1. Web: free-text search box on Home (name / summary), alongside the tag pills
+`GET /places?q=bugis&tags=Cafe,Restaurant` returns tagged places, ordered by rating
+(highest first, unrated last), then name and ID. `q` is optional and limited to 100
+characters; invalid input returns HTTP 400. Search is a literal, case-insensitive
+substring of the name, address, or an assigned tag whose vocabulary facet is `area`.
+Selected tags match ANY tag, ANDed with the search text. Punctuation, `%`, and `_`
+are literal characters, not SQL wildcards or filter expressions.
+
+The home page debounces typing by 300 ms and keeps both `q` and `tags` in the URL.
+Clearing search preserves tags; clearing tags preserves search. Tag changes add a
+history entry, so back/forward restores both; search updates replace the current entry
+rather than adding one per typing pause. The result count describes the current displayed list.
+
+After pulling this change, apply the new migration to an existing **local** database
+without resetting its data:
+
+```sh
+npx supabase migration up --local
+```
+
+Browse uses the `browse_places()` SQL function; Ask keeps its own `search_places()`.
+Run the existing local enrichment command if seed rows have no tags yet; untagged
+rows are not shown on Browse and are not candidates for Ask. Hosted migrations
+remain the team's CI/maintainer responsibility.
+
+Opening badges (SGN-016) calculate from weekly periods in `Asia/Singapore`, with
+inclusive opening and exclusive closing boundaries, split shifts, week wrapping,
+and Google's 24/7 sentinel. Missing/invalid periods show `Hours unknown`; old
+`open_now` snapshots are ignored. Visible badges refresh when the minute changes
+and when returning to the tab. Detail pages distinguish HTTP 404 from other
+errors and discard stale requests when navigating between places (SGN-006).

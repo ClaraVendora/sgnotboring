@@ -15,6 +15,7 @@ export default function TagFilter({ tags, selected, onToggle, onClear }) {
         return (
           <Button
             key={tag}
+            aria-pressed={active}
             size="sm"
             rounded="full"
             flexShrink={0}

@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "test": "node --test",
+    "test:auth:local": "RUN_LOCAL_AUTH_TEST=1 node --test src/routes/me.test.js src/services/auth.integration.test.js",
     "enrich": "node src/scripts/enrich.js",
     "ingest": "node src/scripts/ingest.js"
   },

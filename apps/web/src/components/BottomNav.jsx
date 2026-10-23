@@ -8,7 +8,7 @@ export const NAV_HEIGHT = '64px'
 const TABS = [
   { to: '/', label: 'Discover', icon: LuCompass, end: true },
   { to: '/ask', label: 'Ask', icon: LuSparkles },
-  { to: '/profile', label: 'Profile', icon: LuUserRound },
+  { to: '/profile', label: 'Account', icon: LuUserRound },
 ]
 
 // Mobile-first tab bar fixed to the bottom. NavLink marks the active tab with

@@ -53,6 +53,8 @@ apps/api/src/
                    schema → call service → shape response. Errors: `reply.code(n).send({ error })`.
   services/        outside-world clients (supabase.js, llm.js = Gemini, tags.js = cached vocabulary).
                    No Fastify objects, so scripts can import them.
+  hooks/           Fastify route hooks (require-user.js = `preHandler` that sets `request.user` or
+                   replies 401/503). Token verification itself stays in services/auth.js.
   prompts/         LLM system prompts + JSON schemas, pure functions (tagging.js, ask.js).
   scripts/         runnable jobs: `node src/scripts/<name>.js` (enrich.js = LLM tagging; ingest goes here).
 

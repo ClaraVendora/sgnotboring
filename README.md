@@ -124,7 +124,7 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
 | | Branch | Web | API | Supabase project |
 |---|---|---|---|---|
 | **local** | any | http://localhost:3000 | http://localhost:3001 | CLI in Docker (`npm run db:start`) |
-| **staging** | `staging` | Railway → `staging` env → `web` | Railway → `staging` env → `api` | `sg-not-boring-staging` (`pyaqltngppzgcodojita`) |
+| **staging** | `staging` | https://web-staging-678b.up.railway.app | Railway → `staging` env → `api` | `sg-not-boring-staging` (`pyaqltngppzgcodojita`) |
 | **production** | `main` | https://web-production-543a7.up.railway.app | https://api-production-71f5.up.railway.app | `sg-not-boring` (`pnzjujwgvycdriwomwew`) |
 
 Both apps deploy to Railway as Docker images built from the repo root; each app's `railway.json`
@@ -155,15 +155,16 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 ```
 apps/
   api/                  Fastify backend
-    src/routes/         health.js, places.js (GET /places, /places/:id, /tags), ask.js (POST /ask)
-    src/services/       supabase.js, llm.js (Gemini), tags.js (tag vocabulary)
+    src/routes/         health.js, places.js (GET /places, /places/:id, /tags), ask.js (POST /ask), me.js (GET /me)
+    src/services/       supabase.js, auth.js (verified user), llm.js (Gemini), tags.js (tag vocabulary)
+    src/hooks/          require-user.js (protected endpoint pre-handler)
     src/prompts/        LLM system prompts + JSON schemas (tagging, /ask interpret + rank)
     src/scripts/        enrich.js (LLM tagging job)
     src/server.js       entry point
     Dockerfile          dev + prod stages
     railway.json
   web/                  React + Vite + Chakra UI
-    src/App.jsx         routes:  /  ·  /ask  ·  /places/:id  ·  *   + bottom tab bar
+    src/App.jsx         routes: / · /ask · /profile · /auth/callback · /places/:id · * + bottom tab bar
     src/pages/          Home (tag filter via ?tags=), Ask (chat search), Profile, PlaceDetail, NotFound
     src/components/     BottomNav, TagFilter, PlaceCard, ChatBubble, AskComposer
     src/lib/            api.js (API client), hours.js (open/closed from Google hours)
@@ -189,11 +190,20 @@ the router picks the screen in the browser.
 |---|---|---|
 | `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
 | `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation is component state, not URL |
-| `/profile` | Profile (Profile tab) | editable display name, neighbourhood and bio, saved in this browser on this device |
+| `/profile` | Account | email/password signup, login, verified name/email and logout; Supabase persists sessions across refreshes |
+| `/auth/callback` | Email confirmation | processes the Supabase confirmation response and replaces the URL with `/profile` |
 | `/places/:id` | PlaceDetail | one place |
 | `*` | NotFound | |
 
 Tag filtering matches places that have **any** of the selected tags (`overlaps` in `routes/places.js`; change to `contains` for all-of).
+
+### Accounts (SGN-013) and Auth settings (ENG-03)
+
+See [Auth setup and acceptance checks](docs/auth-setup.md). Email confirmation is enabled locally;
+open http://127.0.0.1:54324 to receive test messages. After changing local Auth settings, stop/start
+Supabase without resetting the database. Hosted staging/production need separate Dashboard configuration.
+`GET /me` verifies the Supabase JWT and returns only the current user's identity; guest discovery remains public.
+Run `npm test -w api` for unit tests and `npm run test:auth:local -w api` for the opt-in local email/token workflow.
 
 ## 8. How tagging and Ask work
 

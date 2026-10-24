@@ -179,7 +179,7 @@ export default function Profile() {
                 {session ? (
                   <>
                     <HStack gap={4}>
-                      <Avatar.Root size="lg" colorPalette="teal">
+                      <Avatar.Root size="lg" colorPalette="blue">
                         <Avatar.Fallback name={account?.display_name || 'Explorer'} />
                       </Avatar.Root>
                       <Stack gap={1} minW={0}>
@@ -199,7 +199,7 @@ export default function Profile() {
                     setMode(value)
                     setFeedback(null)
                     setFields((previous) => ({ ...previous, password: '' }))
-                  }} colorPalette="teal">
+                  }} colorPalette="blue">
                     <Tabs.List mb={5}>
                       <Tabs.Trigger value="login" disabled={Boolean(pending)}>Log in</Tabs.Trigger>
                       <Tabs.Trigger value="signup" disabled={Boolean(pending)}>Sign up</Tabs.Trigger>
@@ -224,7 +224,7 @@ export default function Profile() {
                               value={fields.password} disabled={Boolean(pending)} onChange={(event) => update('password', event.target.value)} />
                             {mode === 'signup' && <Field.HelperText>At least 8 characters. We will email you a confirmation link.</Field.HelperText>}
                           </Field.Root>
-                          <Button type="submit" colorPalette="teal" disabled={!authConfigured || Boolean(pending)} loading={pending === 'submit'}>
+                          <Button type="submit" colorPalette="blue" disabled={!authConfigured || Boolean(pending)} loading={pending === 'submit'}>
                             {mode === 'signup' ? 'Create account' : 'Log in'}
                           </Button>
                           <Button type="button" variant="plain" onClick={resend} disabled={!authConfigured || Boolean(pending)} loading={pending === 'resend'}>
@@ -235,12 +235,12 @@ export default function Profile() {
                     </Tabs.Content>
                   </Tabs.Root>
                 )}
-                {feedback && (!session || feedback.logout) && <Text role={feedback.error ? 'alert' : 'status'} color={feedback.error ? 'fg.error' : 'teal.fg'}>{feedback.message}</Text>}
+                {feedback && (!session || feedback.logout) && <Text role={feedback.error ? 'alert' : 'status'} color={feedback.error ? 'fg.error' : 'blue.fg'}>{feedback.message}</Text>}
               </Card.Body>
             </Card.Root>
           </>
         )}
-        <Link asChild colorPalette="teal"><RouterLink to="/">Continue browsing places →</RouterLink></Link>
+        <Link asChild colorPalette="blue"><RouterLink to="/">Continue browsing places →</RouterLink></Link>
       </Stack>
     </Container>
   )

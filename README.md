@@ -244,6 +244,14 @@ The API containers keep using the host gateway configured in `docker-compose.yml
 New places display immediately without Gemini. To include them in tag filtering and Ask,
 set `GEMINI_API_KEY` separately, then run `npm run enrich -w api`.
 
+Imports also save the Maps result's thumbnail as `places.photo_url`. Browse cards and
+place details show it as a cover image, with the SG not boring default image for missing or broken photos.
+Photos do not require Gemini or a separate per-place photo API request. For places
+imported before photo support, apply local migrations and re-run the desired ingest
+queries to refresh their photos (the usual SerpApi request budget and credits apply).
+Re-imports preserve tags, summaries, and an existing photo if a later result omits it.
+These are external image URLs, so availability and resolution depend on the provider.
+
 ### Sharing with teammates
 
 `docker compose up --build` starts the web app and our Fastify API. Starting them or
@@ -277,7 +285,7 @@ POST /ask { message, history }
 
 ## 9. Browse and search (SGN-001 / SGN-002)
 
-`GET /places?q=bugis&tags=Cafe,Restaurant` returns tagged places, ordered by rating
+`GET /places?q=bugis&tags=Cafe,Restaurant` returns matching places, ordered by rating
 (highest first, unrated last), then name and ID. `q` is optional and limited to 100
 characters; invalid input returns HTTP 400. Search is a literal, case-insensitive
 substring of the name, address, or an assigned tag whose vocabulary facet is `area`.
@@ -297,9 +305,10 @@ npx supabase migration up --local
 ```
 
 Browse uses the `browse_places()` SQL function; Ask keeps its own `search_places()`.
-Run the existing local enrichment command if seed rows have no tags yet; untagged
-rows are not shown on Browse and are not candidates for Ask. Hosted migrations
-remain the team's CI/maintainer responsibility.
+Browse includes untagged imports without a Gemini key. Tag filters match only places
+with assigned tags. Run the existing local enrichment command to add tags and summaries
+and include those places in Ask; Ask still requires Gemini. Hosted migrations remain
+the team's CI/maintainer responsibility.
 
 Opening badges (SGN-016) calculate from weekly periods in `Asia/Singapore`, with
 inclusive opening and exclusive closing boundaries, split shifts, week wrapping,

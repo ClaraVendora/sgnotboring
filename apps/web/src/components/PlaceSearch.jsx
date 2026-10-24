@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Button, HStack, Input } from '@chakra-ui/react'
+import { Box, Button, HStack, Input } from '@chakra-ui/react'
+import { LuSearch } from 'react-icons/lu'
 
 // Synchronize external URL changes without remounting the focused input.
 export default function PlaceSearch({ value, onChange }) {
@@ -16,15 +17,25 @@ export default function PlaceSearch({ value, onChange }) {
   }, [draft, value, onChange])
 
   return (
-    <HStack as="form" onSubmit={(event) => { event.preventDefault(); onChange(draft) }}>
-      <Input
-        type="search"
-        placeholder="Search by name or area"
-        aria-label="Search by name or area"
-        value={draft}
-        maxLength={100}
-        onChange={(event) => setDraft(event.target.value)}
-      />
+    <HStack as="form" gap={3} flexWrap={{ base: 'wrap', sm: 'nowrap' }} onSubmit={(event) => { event.preventDefault(); onChange(draft) }}>
+      <Box position="relative" flex="1" minW="0" width="full">
+        <Box position="absolute" left={4} top="50%" transform="translateY(-50%)" color="fg.subtle" pointerEvents="none" zIndex={1}><LuSearch aria-hidden="true" /></Box>
+        <Input
+          type="search"
+          placeholder="Search by name or area"
+          aria-label="Search by name or area"
+          value={draft}
+          maxLength={100}
+          onChange={(event) => setDraft(event.target.value)}
+          pl={11}
+          h="48px"
+          bg="bg.panel"
+          rounded="9px"
+          fontSize="sm"
+          borderColor="border"
+          _focusVisible={{ borderColor: 'blue.solid', outline: '2px solid #dceaff' }}
+        />
+      </Box>
       {(draft || value) && (
         <Button type="button" variant="ghost" onClick={() => { setDraft(''); onChange('') }}>
           Clear search

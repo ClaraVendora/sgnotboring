@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 
 const CARD_FIELDS =
-  'id, name, address, rating, user_ratings_total, price_level, tags, summary, opening_hours'
+  'id, name, address, rating, user_ratings_total, price_level, tags, summary, opening_hours, photo_url'
 
 export async function searchPlaces({ q = '', tags = '' }) {
   const selected = tags.split(',').map((tag) => tag.trim()).filter(Boolean)

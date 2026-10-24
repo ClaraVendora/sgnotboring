@@ -1,6 +1,6 @@
 import { Box } from '@chakra-ui/react'
 
-// One chat message. `from` is 'user' (right, teal) or 'assistant' (left, muted).
+// One chat message. `from` is 'user' (right, blue) or 'assistant' (left, muted).
 export default function ChatBubble({ from, children }) {
   if (!children) return null
   const mine = from === 'user'
@@ -13,8 +13,8 @@ export default function ChatBubble({ from, children }) {
       rounded="2xl"
       roundedBottomRight={mine ? 'sm' : '2xl'}
       roundedBottomLeft={mine ? '2xl' : 'sm'}
-      bg={mine ? 'teal.solid' : 'bg.muted'}
-      color={mine ? 'teal.contrast' : 'fg'}
+      bg={mine ? 'blue.solid' : 'bg.muted'}
+      color={mine ? 'blue.contrast' : 'fg'}
       whiteSpace="pre-wrap"
     >
       {children}

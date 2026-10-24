@@ -55,7 +55,7 @@ export default function Ask() {
   }
 
   return (
-    <Flex direction="column" minH={`calc(100dvh - ${NAV_HEIGHT} - env(safe-area-inset-bottom))`}>
+    <Flex direction="column" minH={`calc(100dvh - 80px - ${NAV_HEIGHT} - env(safe-area-inset-bottom))`}>
       <Container maxW="lg" flex="1" pt={6} pb={4} px={4}>
         <Stack gap={4}>
           <Stack gap={1}>
@@ -84,7 +84,7 @@ export default function Ask() {
                 {turn.filters && (turn.filters.must_tags.length > 0 || turn.filters.want_tags.length > 0) && (
                   <Wrap gap={1}>
                     {turn.filters.must_tags.map((t) => (
-                      <Badge key={t} colorPalette="teal" variant="solid" size="sm">
+                      <Badge key={t} colorPalette="blue" variant="solid" size="sm">
                         {t}
                       </Badge>
                     ))}
@@ -115,7 +115,7 @@ export default function Ask() {
       <Box
         position="sticky"
         bottom={`calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))`}
-        bg="bg"
+        bg="bg.panel"
         borderTopWidth="1px"
         py={3}
       >

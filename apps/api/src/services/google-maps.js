@@ -6,6 +6,21 @@ const PRICE_LEVELS = [
 ]
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+// Keep only public image URLs; search/API URLs can contain server credentials.
+function coverPhoto(result) {
+  for (const candidate of [result.thumbnail, result.serpapi_thumbnail]) {
+    if (typeof candidate !== 'string' || !candidate.trim()) continue
+    try {
+      const url = new URL(candidate.startsWith('//') ? `https:${candidate}` : candidate)
+      const googleImage = /(^|\.)(googleusercontent\.com|ggpht\.com)$/.test(url.hostname)
+      const serpImage = url.hostname === 'serpapi.com' && url.pathname.startsWith('/images/')
+      if (url.protocol === 'https:' && !url.username && !url.password &&
+          !url.searchParams.has('api_key') && (googleImage || serpImage)) return url.href
+    } catch { /* Try the alternate image URL. */ }
+  }
+  return null
+}
+
 export function normalizeGoogleMapsPlace(result) {
   if (!result.place_id || !result.title) return null
   const latitude = result.gps_coordinates?.latitude
@@ -40,6 +55,7 @@ export function normalizeGoogleMapsPlace(result) {
     regularOpeningHours: weekdayDescriptions.length ? { weekdayDescriptions } : null,
     editorialSummary: result.description ? { text: result.description, languageCode: 'en' } : null,
     googleMapsUri: mapsUrl.href,
+    photoUrl: coverPhoto(result),
   }
 }
 

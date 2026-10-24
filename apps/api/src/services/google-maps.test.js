@@ -28,6 +28,19 @@ test('rejects missing identities and results outside Singapore', () => {
   assert.equal(normalizeGoogleMapsPlace({ ...result, gps_coordinates: null, address: 'Johor Bahru' }), null)
 })
 
+test('keeps public cover photos and handles missing, alternate, and unsafe URLs', () => {
+  const thumbnail = 'https://lh5.googleusercontent.com/p/store-photo=w640-h360-k-no'
+  const alternate = 'https://serpapi.com/images/url/store-photo'
+  assert.equal(normalizeGoogleMapsPlace({ ...result, thumbnail }).photoUrl, thumbnail)
+  assert.equal(normalizeGoogleMapsPlace({ ...result, thumbnail: thumbnail.replace('https:', '') }).photoUrl, thumbnail)
+  assert.equal(normalizeGoogleMapsPlace(result).photoUrl, null)
+  for (const thumbnail of ['', 'broken', 'javascript:alert(1)', 'https://example.com/photo',
+    'https://serpapi.com/search.json?api_key=secret', 'https://lh5.googleusercontent.com/p/photo?api_key=secret']) {
+    assert.equal(normalizeGoogleMapsPlace({ ...result, thumbnail }).photoUrl, null)
+    assert.equal(normalizeGoogleMapsPlace({ ...result, thumbnail, serpapi_thumbnail: alternate }).photoUrl, alternate)
+  }
+})
+
 test('uses one server-side Singapore search, deduplicates and respects the limit', async () => {
   let calls = 0
   const places = await searchGoogleMaps({

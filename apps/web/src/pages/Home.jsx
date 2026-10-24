@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Container, Heading, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
+import { Box, Container, Heading, HStack, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
 import { getPlaces, getTags } from '../lib/api.js'
 import PlaceSearch from '../components/PlaceSearch.jsx'
 import TagFilter from '../components/TagFilter.jsx'
@@ -56,24 +56,33 @@ export default function Home() {
   }
 
   return (
-    <Container maxW="6xl" py={10}>
-      <Stack gap={6}>
-        <Stack gap={1}>
-          <Heading size="3xl">SG is not boring</Heading>
-          <Text color="fg.muted">
+    <Container maxW="6xl" py={{ base: 7, md: 10 }} px={{ base: 5, md: 8 }}>
+      <Stack gap={7}>
+        <Stack gap={2}>
+          <Text color="blue.fg" fontSize="11px" fontWeight="bold" letterSpacing="1.6px" textTransform="uppercase">Discover Singapore</Text>
+          <Heading size="3xl" letterSpacing="-1.1px" fontWeight="bold">SG is not boring</Heading>
+          <Text color="fg.muted" fontSize="sm" lineHeight={1.7}>
             Discover food and experiences around Singapore, curated so you don't have to dig.
           </Text>
         </Stack>
 
-        <PlaceSearch value={q} onChange={search} />
-        {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
-        <TagFilter tags={tags} selected={selected} onToggle={toggle} onClear={() => updateParam('tags', '')} />
+        <Box bg="bg.panel" borderWidth="1px" rounded="13px" p={{ base: 4, md: 5 }}>
+          <Stack gap={4}>
+            <PlaceSearch value={q} onChange={search} />
+            <Text fontSize="10px" color="fg.subtle" fontWeight="bold" letterSpacing="1.4px" textTransform="uppercase">Explore by tag</Text>
+            {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
+            <TagFilter tags={tags} selected={selected} onToggle={toggle} onClear={() => updateParam('tags', '')} />
+          </Stack>
+        </Box>
 
-        <Text role="status" aria-live="polite">
-          {loading
-            ? 'Loading food places…'
-            : places ? `${places.length} food ${places.length === 1 ? 'place' : 'places'}` : 'Could not load food places'}
-        </Text>
+        <HStack justify="space-between" gap={3}>
+          <Heading size="lg" letterSpacing="-0.3px">Places to explore</Heading>
+          <Text role="status" aria-live="polite" fontSize="xs" color="fg.muted" textAlign="right">
+            {loading
+              ? 'Loading food places…'
+              : places ? `${places.length} food ${places.length === 1 ? 'place' : 'places'}` : 'Could not load food places'}
+          </Text>
+        </HStack>
         {error && <Text color="fg.error">Couldn't load places: {error}</Text>}
         {loading && <Spinner />}
         {places?.length === 0 && (

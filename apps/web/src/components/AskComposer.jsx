@@ -29,7 +29,7 @@ export default function AskComposer({ value, onChange, onSubmit, disabled }) {
         fontSize="md" // 16px stops iOS zooming in on focus
         css={{ fieldSizing: 'content' }}
       />
-      <IconButton type="submit" aria-label="Send" colorPalette="teal" rounded="full" disabled={!canSend}>
+      <IconButton type="submit" aria-label="Send" colorPalette="blue" rounded="full" disabled={!canSend}>
         <LuSendHorizontal />
       </IconButton>
     </HStack>

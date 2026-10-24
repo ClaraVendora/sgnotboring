@@ -22,11 +22,11 @@ export default function BottomNav() {
       bottom={0}
       insetX={0}
       zIndex="sticky"
-      bg="bg"
+      bg="bg.panel"
       borderTopWidth="1px"
       pb="env(safe-area-inset-bottom)"
     >
-      <Flex maxW="lg" mx="auto" h={NAV_HEIGHT}>
+      <Flex maxW="lg" mx="auto" h={NAV_HEIGHT} gap={2} px={3} py={2}>
         {TABS.map(({ to, label, icon, end }) => (
           <Link
             key={to}
@@ -37,11 +37,12 @@ export default function BottomNav() {
             gap={0.5}
             color="fg.muted"
             textDecoration="none"
-            _hover={{ textDecoration: 'none', color: 'fg' }}
-            _currentPage={{ color: 'teal.fg' }}
+            rounded="9px"
+            _hover={{ textDecoration: 'none', color: 'blue.fg', bg: 'blue.subtle' }}
+            _currentPage={{ color: 'blue.fg', bg: 'blue.subtle' }}
           >
             <NavLink to={to} end={end}>
-              <Icon as={icon} boxSize={6} />
+              <Icon as={icon} boxSize={5} />
               <Text fontSize="xs" fontWeight="medium">
                 {label}
               </Text>

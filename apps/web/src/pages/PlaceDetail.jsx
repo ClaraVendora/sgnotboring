@@ -3,6 +3,7 @@ import { Link as RouterLink, useParams } from 'react-router-dom'
 import { Badge, Container, Heading, HStack, Link, Spinner, Stack, Text, Wrap } from '@chakra-ui/react'
 import { getPlace } from '../lib/api.js'
 import { useOpenStatus } from '../hooks/useOpenStatus.js'
+import PlacePhoto from '../components/PlacePhoto.jsx'
 
 export default function PlaceDetail() {
   const { id } = useParams()
@@ -44,6 +45,7 @@ export default function PlaceDetail() {
           <RouterLink to="/">← Back</RouterLink>
         </Link>
         <Heading size="3xl">{place.name}</Heading>
+        <PlacePhoto src={place.photo_url} name={place.name} loading="eager" />
         <HStack gap={3} color="fg.muted">
           {place.rating != null && (
             <Text>
@@ -63,7 +65,7 @@ export default function PlaceDetail() {
           </Stack>
         )}
         {place.google_maps_uri && (
-          <Link href={place.google_maps_uri} target="_blank" rel="noreferrer" colorPalette="teal" alignSelf="flex-start">
+          <Link href={place.google_maps_uri} target="_blank" rel="noreferrer" colorPalette="blue" alignSelf="flex-start">
             Open in Google Maps ↗
           </Link>
         )}

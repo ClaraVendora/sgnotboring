@@ -20,7 +20,11 @@ export default function TagFilter({ tags, selected, onToggle, onClear }) {
             rounded="full"
             flexShrink={0}
             variant={active ? 'solid' : 'outline'}
-            colorPalette={active ? 'teal' : 'gray'}
+            colorPalette={active ? 'blue' : 'gray'}
+            bg={active ? 'blue.solid' : 'bg.panel'}
+            borderColor={active ? 'blue.solid' : 'border'}
+            fontWeight={active ? 'semibold' : 'medium'}
+            _hover={{ bg: active ? 'blue.700' : 'blue.subtle' }}
             onClick={() => onToggle(tag)}
           >
             {tag}

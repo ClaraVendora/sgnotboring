@@ -1,6 +1,8 @@
 import { supabase } from '../services/supabase.js'
 import { generateJson, RateLimitError } from '../services/llm.js'
 import { getTagVocabulary } from '../services/tags.js'
+import { createOptionalUser } from '../hooks/require-user.js'
+import { createSavedPlacesService } from '../services/saved-places.js'
 import {
   interpretInput,
   interpretSchema,
@@ -68,11 +70,14 @@ async function rankCandidates({ intent, count, exact, dropped, candidates }, log
 }
 
 export default async function askRoutes(app) {
+  app.decorateRequest('user', null)
+  const savedPlaces = createSavedPlacesService()
   // POST /ask { message, history? } → { reply, places: [...card fields, reason], filters }
   // Two Gemini calls: interpret the message into tags, then rank the search_places() results.
   app.post(
     '/ask',
     {
+      preHandler: createOptionalUser(),
       schema: {
         body: {
           type: 'object',
@@ -132,7 +137,7 @@ export default async function askRoutes(app) {
           { intent: filters.intent, count, exact, dropped, candidates },
           req.log,
         )
-        return { reply: text, places: picks, filters: applied }
+        return { reply: text, places: await savedPlaces.annotate(picks, req.user?.id), filters: applied }
       } catch (err) {
         if (err instanceof RateLimitError) {
           return reply.code(429).send({ error: 'Lots of people asking right now. Try again in a minute.' })

@@ -4,8 +4,12 @@ import { Badge, Container, Heading, HStack, Link, Spinner, Stack, Text, Wrap } f
 import { getPlace } from '../lib/api.js'
 import { useOpenStatus } from '../hooks/useOpenStatus.js'
 import PlacePhoto from '../components/PlacePhoto.jsx'
+import SaveButton from '../components/SaveButton.jsx'
+import SaveFeedback from '../components/SaveFeedback.jsx'
+import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 
 export default function PlaceDetail() {
+  const saves = useSavedPlaces()
   const { id } = useParams()
   const [result, setResult] = useState({ id: null, place: null, error: null })
   const { place, error } = result.id === id ? result : { place: null, error: null }
@@ -44,7 +48,11 @@ export default function PlaceDetail() {
         <Link asChild alignSelf="flex-start">
           <RouterLink to="/">← Back</RouterLink>
         </Link>
-        <Heading size="3xl">{place.name}</Heading>
+        <HStack justify="space-between" align="start">
+          <Heading size="3xl">{place.name}</Heading>
+          <SaveButton name={place.name} {...saves.buttonProps(place)} />
+        </HStack>
+        <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />
         <PlacePhoto src={place.photo_url} name={place.name} loading="eager" />
         <HStack gap={3} color="fg.muted">
           {place.rating != null && (

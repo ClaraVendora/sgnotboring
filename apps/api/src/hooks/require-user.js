@@ -17,3 +17,14 @@ export function createRequireUser(verify = verifyAccessToken) {
     }
   }
 }
+
+// Public browse endpoints accept guests, but a supplied credential must be valid.
+export function createOptionalUser(verify = verifyAccessToken) {
+  const requireUser = createRequireUser(verify)
+  return async (request, reply) => {
+    reply.header('Cache-Control', 'no-store')
+    reply.header('Vary', 'Authorization, Origin')
+    request.user = null
+    if (request.headers.authorization !== undefined) return requireUser(request, reply)
+  }
+}

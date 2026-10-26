@@ -48,23 +48,37 @@ async function request(path, options) {
   return res.json()
 }
 
-const postJson = (path, body) =>
-  request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+async function sessionRequest(path, options = {}, { required = false, token } = {}) {
+  if (token === undefined && authConfigured) {
+    const { data, error } = await getSession()
+    if (error) throw error
+    token = data.session?.access_token
+  }
+  if (required && !token) throw Object.assign(new Error('Please log in again.'), { status: 401 })
+  return request(path, { ...options, headers: {
+    ...options.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  } })
+}
 
 export const getHealth = () => request('/health')
-export async function getAccount() {
-  const { data, error } = await getSession()
-  if (error) throw error
-  if (!data.session) throw Object.assign(new Error('Please log in again.'), { status: 401 })
-  return request('/me', { headers: { Authorization: `Bearer ${data.session.access_token}` } })
-}
+export const getAccount = () => sessionRequest('/me', {}, { required: true })
+export const getSurveyOptions = (token) => sessionRequest('/me/preferences/options', {}, { required: true, token })
+export const getPreferences = (token) => sessionRequest('/me/preferences', {}, { required: true, token })
+export const putPreferences = (tags, token) => sessionRequest('/me/preferences', {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
+}, { required: true, token })
+export const getSavedPlaces = (token) => sessionRequest('/me/saved-places', {}, { required: true, token })
+export const setPlaceSaved = (id, saved, token) => sessionRequest(`/me/saved-places/${encodeURIComponent(id)}`,
+  { method: saved ? 'PUT' : 'DELETE' }, { required: true, token })
 export const getTags = () => request('/tags')
-export const getPlace = (id) => request(`/places/${encodeURIComponent(id)}`)
+export const getPlace = (id) => sessionRequest(`/places/${encodeURIComponent(id)}`)
 export function getPlaces(tags = [], q = '') {
   const qs = new URLSearchParams()
   if (tags.length) qs.set('tags', tags.join(','))
   if (q.trim()) qs.set('q', q.trim())
-  return request(`/places?${qs}`)
+  return sessionRequest(`/places?${qs}`)
 }
 // history: earlier turns [{ role: 'user' | 'assistant', text }] so follow-ups make sense
-export const askPlaces = (message, history = []) => postJson('/ask', { message, history })
+export const askPlaces = (message, history = []) => sessionRequest('/ask', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history }),
+})

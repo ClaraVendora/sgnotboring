@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Box, Container, Heading, HStack, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, Container, Heading, HStack, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
 import { getPlaces, getTags } from '../lib/api.js'
 import PlaceSearch from '../components/PlaceSearch.jsx'
 import TagFilter from '../components/TagFilter.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
+import QuickFilters from '../components/QuickFilters.jsx'
+import { useCurrentMinute } from '../hooks/useOpenStatus.js'
+import { filterOpenPlaces } from '../lib/place-filters.js'
 
 // Selected tags live in the URL (?tags=Late%20Night,Spicy) so filtered views are
 // shareable and the back button works. Search (?q=) replaces the current entry instead,
@@ -15,6 +18,9 @@ export default function Home() {
 
   const tagsKey = selected.join(',')
   const q = searchParams.get('q') ?? ''
+  const openNow = searchParams.get('open_now') === '1'
+  const minute = useCurrentMinute()
+  const [moreFilters, setMoreFilters] = useState(false)
   const resultKey = JSON.stringify([tagsKey, q])
   const updateParam = useCallback((name, value, options) => {
     setSearchParams((previous) => {
@@ -30,7 +36,8 @@ export default function Home() {
   const [tagsError, setTagsError] = useState(false)
   const [result, setResult] = useState({ key: null, places: null, error: null })
   const loading = result.key !== resultKey
-  const { places, error } = loading ? { places: null, error: null } : result
+  const { places: fetchedPlaces, error } = loading ? { places: null, error: null } : result
+  const places = fetchedPlaces && filterOpenPlaces(fetchedPlaces, openNow, new Date(minute))
 
   useEffect(() => {
     let cancelled = false
@@ -69,9 +76,27 @@ export default function Home() {
         <Box bg="bg.panel" borderWidth="1px" rounded="13px" p={{ base: 4, md: 5 }}>
           <Stack gap={4}>
             <PlaceSearch value={q} onChange={search} />
-            <Text fontSize="10px" color="fg.subtle" fontWeight="bold" letterSpacing="1.4px" textTransform="uppercase">Explore by tag</Text>
-            {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
-            <TagFilter tags={tags} selected={selected} onToggle={toggle} onClear={() => updateParam('tags', '')} />
+            <QuickFilters selected={selected} openNow={openNow} onToggleTag={toggle}
+              onToggleOpenNow={() => updateParam('open_now', openNow ? '' : '1')} />
+            <HStack gap={3}>
+              <Button size="sm" variant="ghost" onClick={() => setMoreFilters((value) => !value)}
+                aria-expanded={moreFilters} aria-controls="all-tag-filters">
+                More filters{selected.length ? ` (${selected.length} selected)` : ''}
+              </Button>
+              {(selected.length > 0 || openNow) && <Button size="sm" variant="ghost" onClick={() => {
+                setSearchParams((previous) => {
+                  const next = new URLSearchParams(previous)
+                  next.delete('tags')
+                  next.delete('open_now')
+                  return next
+                })
+              }}>Clear filters</Button>}
+            </HStack>
+            <Box id="all-tag-filters" hidden={!moreFilters}>
+              {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
+              <TagFilter tags={[...new Set([...tags, ...selected])].sort()} selected={selected}
+                onToggle={toggle} onClear={() => updateParam('tags', '')} />
+            </Box>
           </Stack>
         </Box>
 
@@ -87,7 +112,8 @@ export default function Home() {
         {loading && <Spinner />}
         {places?.length === 0 && (
           <Text color="fg.muted">
-            {q || selected.length ? 'No food places match your search and filters.' : 'No food places to show yet.'}
+            {openNow ? 'No matching food places are open now. Try another area or turn off Open now.' :
+              q || selected.length ? 'No food places match your search and filters.' : 'No food places to show yet.'}
           </Text>
         )}
         {places?.length > 0 && (

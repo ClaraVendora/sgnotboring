@@ -8,7 +8,7 @@ import { NAV_HEIGHT } from '../components/BottomNav.jsx'
 
 const SUGGESTIONS = [
   'Cheap supper for 6 after midnight',
-  'Quiet cafe to study in Tiong Bahru',
+  'Quiet cafe in Tiong Bahru open now',
   'Atas date night with good cocktails',
   'Halal food near Bugis',
 ]
@@ -81,8 +81,9 @@ export default function Ask() {
             ) : (
               <Stack key={i} gap={3}>
                 <ChatBubble from={turn.from}>{turn.text}</ChatBubble>
-                {turn.filters && (turn.filters.must_tags.length > 0 || turn.filters.want_tags.length > 0) && (
+                {turn.filters && (turn.filters.open_now || turn.filters.must_tags.length > 0 || turn.filters.want_tags.length > 0) && (
                   <Wrap gap={1}>
+                    {turn.filters.open_now && <Badge colorPalette="green" variant="solid" size="sm">Open now</Badge>}
                     {turn.filters.must_tags.map((t) => (
                       <Badge key={t} colorPalette="blue" variant="solid" size="sm">
                         {t}
@@ -96,7 +97,7 @@ export default function Ask() {
                   </Wrap>
                 )}
                 {turn.places?.map((p) => (
-                  <PlaceCard key={p.id} place={p} reason={p.reason} />
+                  <PlaceCard key={p.id} place={p} reason={p.reason} compact />
                 ))}
               </Stack>
             ),

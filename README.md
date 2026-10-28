@@ -316,3 +316,39 @@ and Google's 24/7 sentinel. Missing/invalid periods show `Hours unknown`; old
 `open_now` snapshots are ignored. Visible badges refresh when the minute changes
 and when returning to the tab. Detail pages distinguish HTTP 404 from other
 errors and discard stale requests when navigating between places (SGN-006).
+
+### Sprint 4: quick filters and shared opening hours
+
+Home shows Open now, Under $20, Supper, Cafe and Group. The four tag-backed
+shortcuts map to Budget, Late Night, Cafe and Group Friendly in
+`apps/web/src/lib/place-filters.js`; the full tag list is under More filters.
+`?open_now=1` is browser-calculated and ANDed with the API's search/tag result set.
+It excludes unknown hours and refreshes when the minute changes or the tab regains
+focus. Clear filters preserves the search term; Clear search preserves filters.
+
+`PlaceCard` supports a full photo card and `compact` (64 px thumbnail) for AI Search
+and the saved-list caller in SGN-015. Both display the assigned area tag, price,
+compact review count and at most three tags. Missing or failed photos use a neutral
+placeholder. `save` retains SGN-015's presentational button interface; save clicks
+are outside the detail-page link. Area labels follow the controlled area vocabulary
+in `create_tags`; extend the card helper if a later migration adds an area.
+
+Web and API import the same `@sgnotboring/shared/hours` workspace. Docker builds
+and development mounts include it. No new environment variables are required.
+`POST /ask` adds `filters.open_now`; explicit current-time requests are hard-filtered
+before candidate limiting/ranking. Unknown schedules are excluded even during
+fallback/relaxation. Empty open-now results give a next-opening suggestion when the
+catalogue has a known matching schedule; ordinary requests keep existing ranking.
+AI result cards now receive `photo_url` as well.
+
+Run the focused checks without external services:
+
+```sh
+npm run test -w @sgnotboring/shared
+node --test apps/web/src/lib/place-card.test.js
+npm run test -w api
+npm run lint
+npm run build
+```
+
+Existing API auth integration tests remain opt-in through `test:auth:local`.

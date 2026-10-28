@@ -2,9 +2,10 @@
   "name": "sgnotboring",
   "private": true,
   "version": "0.1.0",
-  "description": "Singapore Discovery Hub (MVP) — AI-curated food & experiences for young Singaporeans",
+  "description": "Singapore Discovery Hub (MVP) \u2014 AI-curated food & experiences for young Singaporeans",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "turbo run dev",

@@ -29,7 +29,10 @@ function subscribe(listener) {
   }
 }
 const snapshot = () => now
+export function useCurrentMinute() {
+  return useSyncExternalStore(subscribe, snapshot)
+}
 export function useOpenStatus(hours) {
-  const time = useSyncExternalStore(subscribe, snapshot)
+  const time = useCurrentMinute()
   return openStatus(hours, new Date(time))
 }

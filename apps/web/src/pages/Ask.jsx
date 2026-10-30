@@ -7,7 +7,6 @@ import AskErrorAlert from '../components/AskErrorAlert.jsx'
 import ChatBubble from '../components/ChatBubble.jsx'
 import PersonalisedToggle from '../components/PersonalisedToggle.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
-import { NAV_HEIGHT } from '../components/BottomNav.jsx'
 import SaveFeedback from '../components/SaveFeedback.jsx'
 import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 import { useAsk } from '../hooks/useAsk.js'
@@ -76,7 +75,7 @@ export default function Ask() {
   }, [turns.length, pending])
 
   return (
-    <Flex direction="column" minH={`calc(100dvh - 80px - ${NAV_HEIGHT} - env(safe-area-inset-bottom))`}>
+    <Flex direction="column" minH="calc(100dvh - 81px - var(--bottom-nav-space))">
       <Container maxW="lg" flex="1" pt={6} pb={4} px={4}>
         <Stack gap={4}>
           <HStack justify="space-between" align="start" gap={3}>
@@ -146,13 +145,13 @@ export default function Ask() {
             </HStack>
           )}
           {/* scroll target; the margin keeps the latest message clear of the sticky composer and tab bar */}
-          <Box ref={endRef} scrollMarginBottom={`calc(${NAV_HEIGHT} + 88px + env(safe-area-inset-bottom))`} />
+          <Box ref={endRef} scrollMarginBottom="calc(var(--bottom-nav-space) + 88px)" />
         </Stack>
       </Container>
 
       <Box
         position="sticky"
-        bottom={`calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))`}
+        bottom="var(--bottom-nav-space)"
         bg="bg.panel"
         borderTopWidth="1px"
         py={3}

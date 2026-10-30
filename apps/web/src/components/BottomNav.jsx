@@ -1,23 +1,16 @@
-import { NavLink } from 'react-router-dom'
-import { Box, Flex, Icon, Link, Text } from '@chakra-ui/react'
-import { LuCompass, LuSparkles, LuUserRound } from 'react-icons/lu'
+import { Box, Flex } from '@chakra-ui/react'
+import NavigationLinks from './NavigationLinks.jsx'
 
 // Height of the bar itself; the iOS home-indicator inset is added on top of it.
 export const NAV_HEIGHT = '64px'
 
-const TABS = [
-  { to: '/', label: 'Discover', icon: LuCompass, end: true },
-  { to: '/ask', label: 'Ask', icon: LuSparkles },
-  { to: '/profile', label: 'Account', icon: LuUserRound },
-]
-
-// Mobile-first tab bar fixed to the bottom. NavLink marks the active tab with
-// aria-current="page", which `_currentPage` styles.
-export default function BottomNav() {
+// Hidden (including from the keyboard/accessibility tree) at the desktop breakpoint.
+export default function BottomNav({ activeTab }) {
   return (
     <Box
       as="nav"
       aria-label="Main navigation"
+      display={{ base: 'block', md: 'none' }}
       position="fixed"
       bottom={0}
       insetX={0}
@@ -27,28 +20,7 @@ export default function BottomNav() {
       pb="env(safe-area-inset-bottom)"
     >
       <Flex maxW="lg" mx="auto" h={NAV_HEIGHT} gap={2} px={3} py={2}>
-        {TABS.map(({ to, label, icon, end }) => (
-          <Link
-            key={to}
-            asChild
-            flex="1"
-            flexDirection="column"
-            justifyContent="center"
-            gap={0.5}
-            color="fg.muted"
-            textDecoration="none"
-            rounded="9px"
-            _hover={{ textDecoration: 'none', color: 'blue.fg', bg: 'blue.subtle' }}
-            _currentPage={{ color: 'blue.fg', bg: 'blue.subtle' }}
-          >
-            <NavLink to={to} end={end}>
-              <Icon as={icon} boxSize={5} />
-              <Text fontSize="xs" fontWeight="medium">
-                {label}
-              </Text>
-            </NavLink>
-          </Link>
-        ))}
+        <NavigationLinks activeTab={activeTab} compact />
       </Flex>
     </Box>
   )

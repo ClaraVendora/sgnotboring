@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { Box } from '@chakra-ui/react'
 import Home from './pages/Home.jsx'
 import Ask from './pages/Ask.jsx'
@@ -18,23 +18,35 @@ export default function App() {
       <SessionProvider>
         <SavedPlacesProvider>
           <AskProvider>
-            {/* bottom padding keeps page content clear of the fixed tab bar */}
-            <Box minH="100dvh" pb={`calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))`}>
-              <SiteHeader />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/ask" element={<Ask />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/auth/callback" element={<Profile />} />
-                <Route path="/places/:id" element={<PlaceDetail />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Box>
-            <BottomNav />
+            <AppLayout />
           </AskProvider>
         </SavedPlacesProvider>
       </SessionProvider>
     </BrowserRouter>
+  )
+}
+
+function AppLayout() {
+  const { pathname } = useLocation()
+  const activeTab = ['/profile', '/onboarding', '/auth/callback'].includes(pathname)
+    ? '/profile' : pathname === '/ask' ? '/ask' : pathname === '/' ? '/' : null
+  return (
+    <Box minH="100dvh" css={{
+      '--bottom-nav-space': { base: `calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))`, md: '0px' },
+    }} pb="var(--bottom-nav-space)">
+      <SiteHeader activeTab={activeTab} />
+      <Box as="main" id="main-content">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/ask" element={<Ask />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/auth/callback" element={<Profile />} />
+          <Route path="/places/:id" element={<PlaceDetail />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Box>
+      <BottomNav activeTab={activeTab} />
+    </Box>
   )
 }

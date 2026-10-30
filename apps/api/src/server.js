@@ -16,7 +16,7 @@ const WEB_ORIGINS = (process.env.WEB_ORIGIN ?? 'http://localhost:3000')
 
 const app = Fastify({ logger: true })
 
-await app.register(cors, { origin: WEB_ORIGINS })
+await app.register(cors, { origin: WEB_ORIGINS, methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE'] })
 await app.register(healthRoutes)
 await app.register(placesRoutes)
 await app.register(askRoutes)

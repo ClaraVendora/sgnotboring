@@ -5,7 +5,8 @@ import { placeMeta } from '../lib/place-card.js'
 import PlacePhoto from './PlacePhoto.jsx'
 import SaveButton from './SaveButton.jsx'
 
-// `save` and `compact` retain the interface used by SGN-015's saved places list.
+// `reason`: optional one-liner from /ask on why this place was picked.
+// `save`: SaveButton props from useSavedPlaces. `compact`: thumbnail row for lists and chat.
 export default function PlaceCard({ place, reason, save, compact = false }) {
   const status = useOpenStatus(place?.opening_hours)
   if (!place) return null

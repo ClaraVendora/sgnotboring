@@ -2,6 +2,8 @@ import { searchCandidates, findNextOpening } from '../services/ask-candidates.js
 import { explicitOpenNow, noOpenPlacesReply } from '../services/open-now.js'
 import { generateJson, RateLimitError } from '../services/llm.js'
 import { getTagVocabulary } from '../services/tags.js'
+import { createOptionalUser } from '../hooks/require-user.js'
+import { createSavedPlacesService, withSavedFlags } from '../services/saved-places.js'
 import {
   interpretInput,
   interpretSchema,
@@ -60,12 +62,15 @@ async function rankCandidates({ intent, count, exact, dropped, candidates, openN
 export default async function askRoutes(app, {
   generate = generateJson, vocabulary = getTagVocabulary, candidatesFor = searchCandidates,
   nextOpeningFor = findNextOpening, clock = () => new Date(),
+  verifyUser, savedPlaces = createSavedPlacesService(),
 } = {}) {
+  app.decorateRequest('user', null)
   // POST /ask { message, history? } → { reply, places: [...card fields, reason], filters }
   // Two Gemini calls: interpret the message into tags, then rank the search_places() results.
   app.post(
     '/ask',
     {
+      preHandler: createOptionalUser(verifyUser),
       schema: {
         body: {
           type: 'object',
@@ -132,7 +137,7 @@ export default async function askRoutes(app, {
           req.log, generate,
         )
         const replyText = openNow && !/open (?:right )?now/i.test(text) ? `These places are open right now. ${text}` : text
-        return { reply: replyText, places: picks, filters: applied }
+        return { reply: replyText, places: await withSavedFlags(savedPlaces, picks, req.user?.id, req.log), filters: applied }
       } catch (err) {
         if (err instanceof RateLimitError) {
           return reply.code(429).send({ error: 'Lots of people asking right now. Try again in a minute.' })

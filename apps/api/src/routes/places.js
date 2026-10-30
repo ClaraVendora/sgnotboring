@@ -1,11 +1,19 @@
 import { supabase } from '../services/supabase.js'
 import { searchPlaces } from '../services/places.js'
+import { createOptionalUser } from '../hooks/require-user.js'
+import { createSavedPlacesService, withSavedFlags } from '../services/saved-places.js'
 
-export default async function placesRoutes(app) {
+export default async function placesRoutes(app, options = {}) {
+  app.decorateRequest('user', null)
+  const optionalUser = createOptionalUser(options.verifyUser)
+  const savedPlaces = options.savedPlaces ?? createSavedPlacesService()
+  const search = options.searchPlaces ?? searchPlaces
+  const db = options.db ?? supabase
   // GET /places?tags=Late%20Night,Spicy  → places matching ANY of the tags
   app.get(
     '/places',
     {
+      preHandler: optionalUser,
       schema: {
         querystring: {
           type: 'object',
@@ -18,12 +26,14 @@ export default async function placesRoutes(app) {
       },
     },
     async (req, reply) => {
+      let places
       try {
-        return await searchPlaces(req.query)
+        places = await search(req.query)
       } catch (error) {
         req.log.error(error, 'Could not search places')
         return reply.code(500).send({ error: 'Could not load places' })
       }
+      return withSavedFlags(savedPlaces, places, req.user?.id, req.log)
     },
   )
 
@@ -31,6 +41,7 @@ export default async function placesRoutes(app) {
   app.get(
     '/places/:id',
     {
+      preHandler: optionalUser,
       schema: {
         params: {
           type: 'object',
@@ -40,15 +51,17 @@ export default async function placesRoutes(app) {
       },
     },
     async (req, reply) => {
-      const { data, error } = await supabase
-        .from('places')
-        .select('*')
-        .eq('id', req.params.id)
-        .maybeSingle()
-
-      if (error) return reply.code(500).send({ error: error.message })
-      if (!data) return reply.code(404).send({ error: 'Place not found' })
-      return data
+      let place
+      try {
+        const { data, error } = await db.from('places').select('*').eq('id', req.params.id).maybeSingle()
+        if (error) throw error
+        place = data
+      } catch (error) {
+        req.log.error(error, 'Could not load place')
+        return reply.code(500).send({ error: 'Could not load place' })
+      }
+      if (!place) return reply.code(404).send({ error: 'Place not found' })
+      return (await withSavedFlags(savedPlaces, [place], req.user?.id, req.log))[0]
     },
   )
 

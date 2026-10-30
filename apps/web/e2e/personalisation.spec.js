@@ -217,3 +217,59 @@ test('account switch ignores an old pending save response and AI cards share hea
   await expect(page.getByRole('heading', { name: 'Saved places (1)' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Unsave Odette', exact: true })).toBeVisible()
 })
+
+async function authKey(page) {
+  return page.evaluate(() => Object.keys(localStorage).find((key) => key.endsWith('-auth-token')))
+}
+
+test('a rejected login token falls back to guest browsing instead of failing Home and detail', async ({ page }) => {
+  await login(page, await user())
+  // A revoked token the SDK still considers unexpired: the API rejects it with 401.
+  await page.evaluate((key) => {
+    const session = JSON.parse(localStorage.getItem(key))
+    localStorage.setItem(key, JSON.stringify({ ...session, access_token: 'revoked', expires_at: Math.floor(Date.now() / 1000) + 3000 }))
+  }, await authKey(page))
+  await page.goto('/')
+  await expect(page.getByRole('link', { name: 'Odette', exact: true })).toBeVisible()
+  await expect(page.getByText("Couldn't load places")).toHaveCount(0)
+  await page.getByRole('link', { name: 'Odette', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Odette', exact: true })).toBeVisible()
+})
+
+test('a routine token refresh keeps unsaved survey answers and saved places', async ({ page }) => {
+  test.setTimeout(120000)
+  let savedListLoads = 0
+  page.on('request', (request) => {
+    if (request.method() === 'GET' && request.url().endsWith('/me/saved-places')) savedListLoads++
+  })
+  await login(page, await user())
+  await page.goto('/onboarding')
+  await page.getByRole('button', { name: 'Hawker food', exact: true }).click()
+  await page.getByRole('button', { name: 'Cafes', exact: true }).click()
+  const loadsBefore = savedListLoads
+  const key = await authKey(page)
+  const before = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)).access_token, key)
+  // Near expiry, the SDK's auto-refresh tick (every 30s) rotates the token.
+  await page.evaluate((k) => {
+    const session = JSON.parse(localStorage.getItem(k))
+    localStorage.setItem(k, JSON.stringify({ ...session, expires_at: Math.floor(Date.now() / 1000) + 20 }))
+  }, key)
+  await page.waitForFunction(([k, token]) => JSON.parse(localStorage.getItem(k)).access_token !== token, [key, before], { timeout: 75000 })
+  await expect(page.locator('[aria-pressed="true"]')).toHaveCount(2)
+  expect(savedListLoads).toBe(loadsBefore)
+  await page.getByRole('button', { name: 'Finish', exact: true }).click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByText('Hawker', { exact: true })).toBeVisible()
+})
+
+test('auth callback opens the survey only for users without preferences', async ({ page }) => {
+  const returning = await user()
+  expect((await admin.from('preferences').insert({ user_id: returning.id, tags: ['Cafe'] })).error).toBeNull()
+  await login(page, returning)
+  await page.goto('/auth/callback')
+  await expect(page).toHaveURL(/\/profile$/)
+  await page.getByRole('button', { name: 'Log out', exact: true }).click()
+  await login(page, await user())
+  await page.goto('/auth/callback')
+  await expect(page).toHaveURL(/\/onboarding$/)
+})

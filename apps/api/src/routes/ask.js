@@ -2,7 +2,7 @@ import { supabase } from '../services/supabase.js'
 import { generateJson, RateLimitError } from '../services/llm.js'
 import { getTagVocabulary } from '../services/tags.js'
 import { createOptionalUser } from '../hooks/require-user.js'
-import { createSavedPlacesService } from '../services/saved-places.js'
+import { createSavedPlacesService, withSavedFlags } from '../services/saved-places.js'
 import {
   interpretInput,
   interpretSchema,
@@ -137,7 +137,7 @@ export default async function askRoutes(app) {
           { intent: filters.intent, count, exact, dropped, candidates },
           req.log,
         )
-        return { reply: text, places: await savedPlaces.annotate(picks, req.user?.id), filters: applied }
+        return { reply: text, places: await withSavedFlags(savedPlaces, picks, req.user?.id, req.log), filters: applied }
       } catch (err) {
         if (err instanceof RateLimitError) {
           return reply.code(429).send({ error: 'Lots of people asking right now. Try again in a minute.' })

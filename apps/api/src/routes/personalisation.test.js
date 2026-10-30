@@ -127,3 +127,22 @@ test('invalid UUIDs, missing places and database failures return safe errors', a
     assert.ok(!res.body.includes('private'))
   }
 })
+
+test('public browse never depends on Auth or saved flags being available', async (t) => {
+  const fail = async () => { throw new Error('private outage details') }
+  const app = Fastify()
+  t.after(() => app.close())
+  await app.register(placesRoutes, { verifyUser: fail, savedPlaces: { annotate: fail }, searchPlaces: async () => [place],
+    db: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: place }) }) }) }) } })
+  for (const url of ['/places', `/places/${placeId}`]) {
+    // Auth unreachable: a supplied token is served as a guest instead of 503.
+    const outage = await app.inject({ url, headers })
+    assert.equal(outage.statusCode, 200)
+    assert.equal([outage.json()].flat()[0].saved, false)
+    // Saved-flag lookup failure falls back to saved: false instead of 500.
+    const guest = await app.inject({ url })
+    assert.equal(guest.statusCode, 200)
+    assert.equal([guest.json()].flat()[0].saved, false)
+    assert.ok(!guest.body.includes('private'))
+  }
+})

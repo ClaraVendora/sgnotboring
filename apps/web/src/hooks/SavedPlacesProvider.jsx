@@ -3,11 +3,12 @@ import { getSavedPlaces, setPlaceSaved } from '../lib/api.js'
 import { useSession } from './useSession.js'
 import { SavedPlacesContext } from './useSavedPlaces.js'
 
-// Remount immediately on identity/token changes: no previous account's list,
-// optimistic state or late response can enter the next account's state.
+// Remount immediately on account changes: no previous account's list, optimistic
+// state or late response can enter the next account's state. A routine token refresh
+// keeps the same account, so it must not reload the list or drop pending saves.
 export function SavedPlacesProvider({ children }) {
   const { session, loading } = useSession()
-  return <SavedPlacesState key={`${session?.user.id}:${session?.access_token}`}
+  return <SavedPlacesState key={session?.user.id ?? 'guest'}
     session={session} authLoading={loading}>{children}</SavedPlacesState>
 }
 
@@ -20,7 +21,7 @@ function SavedPlacesState({ session, authLoading, children }) {
   const inFlight = useRef(new Set())
   const alive = useRef(true)
   const [attempt, setAttempt] = useState(0)
-  const token = session?.access_token
+  const userId = session?.user.id
 
   useEffect(() => {
     alive.current = true
@@ -28,8 +29,8 @@ function SavedPlacesState({ session, authLoading, children }) {
   }, [])
   useEffect(() => {
     let active = true
-    if (!token) return
-    getSavedPlaces(token).then(({ places }) => {
+    if (!userId) return
+    getSavedPlaces().then(({ places }) => {
       if (active) {
         setPlaces(places)
         setLoadError('')
@@ -42,7 +43,7 @@ function SavedPlacesState({ session, authLoading, children }) {
       }
     })
     return () => { active = false }
-  }, [token, attempt])
+  }, [userId, attempt])
 
   async function toggle(place) {
     if (authLoading || inFlight.current.has(place.id)) return
@@ -61,7 +62,7 @@ function SavedPlacesState({ session, authLoading, children }) {
       ? [{ ...place, saved: true }, ...list]
       : list.filter(({ id }) => id !== place.id))
     try {
-      await setPlaceSaved(place.id, nextSaved, token)
+      await setPlaceSaved(place.id, nextSaved)
       if (alive.current) setFeedback({ message: nextSaved ? `${place.name} saved.` : `${place.name} removed from saved places.` })
     } catch (error) {
       if (!alive.current) return

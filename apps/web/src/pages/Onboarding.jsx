@@ -11,15 +11,15 @@ export default function Onboarding() {
   const [options, setOptions] = useState(null)
   const [optionsError, setOptionsError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const token = session?.access_token
+  const userId = session?.user.id
   useEffect(() => {
     let active = true
-    if (!token) return
-    getSurveyOptions(token).then(({ questions }) => {
+    if (!userId) return
+    getSurveyOptions().then(({ questions }) => {
       if (active) { setOptions(questions); setOptionsError('') }
     }).catch(() => { if (active) setOptionsError('Could not load the survey. Please try again.') })
     return () => { active = false }
-  }, [token, attempt])
+  }, [userId, attempt])
 
   return <Container maxW="2xl" py={{ base: 8, md: 12 }}>
     <Stack gap={6}>
@@ -35,14 +35,14 @@ export default function Onboarding() {
         <Text role="alert" color="fg.error">{error || optionsError}</Text>
         <Button variant="outline" onClick={() => { retry(); setAttempt((n) => n + 1) }}>Retry survey</Button>
       </Stack> : loading || !options ? <HStack role="status"><Spinner size="sm" /><Text>Loading your preferences…</Text></HStack>
-        : <SurveyForm key={preferences?.updated_at || 'new'} questions={options} initialTags={preferences?.tags ?? []} token={token} />}
+        : <SurveyForm key={preferences?.updated_at || 'new'} questions={options} initialTags={preferences?.tags ?? []} />}
       <Link asChild colorPalette="blue"><RouterLink to="/">Continue browsing places →</RouterLink></Link>
       {(session && (loading || error || optionsError || !options)) && <Link asChild><RouterLink to="/profile">Skip for now</RouterLink></Link>}
     </Stack>
   </Container>
 }
 
-function SurveyForm({ questions, initialTags, token }) {
+function SurveyForm({ questions, initialTags }) {
   const [tags, setTags] = useState(initialTags)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
@@ -61,7 +61,7 @@ function SurveyForm({ questions, initialTags, token }) {
     setPending(true)
     setError('')
     try {
-      await putPreferences(tags, token)
+      await putPreferences(tags)
       navigate('/profile', { replace: true })
     } catch (error) {
       setError(error.status === 401 ? 'Your session expired. Please log in again.'

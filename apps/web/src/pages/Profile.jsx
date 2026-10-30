@@ -19,7 +19,8 @@ export default function Profile() {
   const [feedback, setFeedback] = useState(null)
   const [accountResult, setAccountResult] = useState(null)
   const [accountAttempt, setAccountAttempt] = useState(0)
-  const accountKey = `${session?.user.id}:${session?.access_token}:${accountAttempt}`
+  const userId = session?.user.id
+  const accountKey = `${userId}:${accountAttempt}`
   const account = accountResult?.key === accountKey ? accountResult.user : null
   const accountError = accountResult?.key === accountKey ? accountResult.error : ''
   const location = useLocation()
@@ -34,15 +35,18 @@ export default function Profile() {
       ? authErrorMessage({ code: code || 'otp_expired' }) : ''
   })
 
+  // Only a first-time confirmation (no survey answers yet) opens the survey; anyone who
+  // already has preferences lands on Account.
+  const firstTime = !prefs.loading && !prefs.preferences
   useEffect(() => {
-    if (!loading && location.pathname === '/auth/callback') {
-      navigate(session && !callbackError ? '/onboarding' : '/profile', { replace: true })
-    }
-  }, [loading, session, callbackError, location.pathname, navigate])
+    if (loading || location.pathname !== '/auth/callback') return
+    if (!session || callbackError) navigate('/profile', { replace: true })
+    else if (!prefs.loading) navigate(firstTime ? '/onboarding' : '/profile', { replace: true })
+  }, [loading, session, callbackError, prefs.loading, firstTime, location.pathname, navigate])
 
   useEffect(() => {
     let active = true
-    if (!session) return
+    if (!userId) return
     getAccount().then(({ user }) => {
       if (active) setAccountResult({ key: accountKey, user, error: '' })
     }).catch((error) => {
@@ -51,7 +55,7 @@ export default function Profile() {
         : 'Could not load your account. Check your connection and retry.' })
     })
     return () => { active = false }
-  }, [session, accountKey])
+  }, [userId, accountKey])
 
   const update = (key, value) => {
     setFields((previous) => ({ ...previous, [key]: value }))

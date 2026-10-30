@@ -1,7 +1,7 @@
 import { supabase } from '../services/supabase.js'
 import { searchPlaces } from '../services/places.js'
 import { createOptionalUser } from '../hooks/require-user.js'
-import { createSavedPlacesService } from '../services/saved-places.js'
+import { createSavedPlacesService, withSavedFlags } from '../services/saved-places.js'
 
 export default async function placesRoutes(app, options = {}) {
   app.decorateRequest('user', null)
@@ -26,12 +26,14 @@ export default async function placesRoutes(app, options = {}) {
       },
     },
     async (req, reply) => {
+      let places
       try {
-        return await savedPlaces.annotate(await search(req.query), req.user?.id)
+        places = await search(req.query)
       } catch (error) {
         req.log.error(error, 'Could not search places')
         return reply.code(500).send({ error: 'Could not load places' })
       }
+      return withSavedFlags(savedPlaces, places, req.user?.id, req.log)
     },
   )
 
@@ -49,15 +51,17 @@ export default async function placesRoutes(app, options = {}) {
       },
     },
     async (req, reply) => {
+      let place
       try {
         const { data, error } = await db.from('places').select('*').eq('id', req.params.id).maybeSingle()
         if (error) throw error
-        if (!data) return reply.code(404).send({ error: 'Place not found' })
-        return (await savedPlaces.annotate([data], req.user?.id))[0]
+        place = data
       } catch (error) {
         req.log.error(error, 'Could not load place')
         return reply.code(500).send({ error: 'Could not load place' })
       }
+      if (!place) return reply.code(404).send({ error: 'Place not found' })
+      return (await withSavedFlags(savedPlaces, [place], req.user?.id, req.log))[0]
     },
   )
 

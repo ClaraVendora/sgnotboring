@@ -1,5 +1,16 @@
 import { supabase } from './supabase.js'
 
+// Saved flags decorate public results; failing to read them must not fail the request
+// (or throw away a finished AI answer). Falls back to the guest view: saved: false.
+export async function withSavedFlags(savedPlaces, places, userId, log) {
+  try {
+    return await savedPlaces.annotate(places, userId)
+  } catch (error) {
+    log.error(error, 'Could not load saved flags')
+    return places.map((place) => ({ ...place, saved: false }))
+  }
+}
+
 export function createSavedPlacesService(db = supabase) {
   return {
     async list(userId) {

@@ -48,28 +48,38 @@ async function request(path, options) {
   return res.json()
 }
 
-async function sessionRequest(path, options = {}, { required = false, token } = {}) {
-  if (token === undefined && authConfigured) {
+// Reads the current access token on every call, so a routine refresh is picked up without
+// callers tracking tokens. Guest-capable calls (required: false) fall back to a guest
+// request when the session cannot be read or the API rejects the token.
+async function sessionRequest(path, options = {}, { required = false } = {}) {
+  let token
+  if (authConfigured) {
     const { data, error } = await getSession()
-    if (error) throw error
-    token = data.session?.access_token
+    if (error && required) throw error
+    token = data?.session?.access_token
   }
   if (required && !token) throw Object.assign(new Error('Please log in again.'), { status: 401 })
-  return request(path, { ...options, headers: {
-    ...options.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const send = (credential) => request(path, { ...options, headers: {
+    ...options.headers, ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
   } })
+  try {
+    return await send(token)
+  } catch (error) {
+    if (required || !token || error.status !== 401) throw error
+    return send(null)
+  }
 }
 
 export const getHealth = () => request('/health')
 export const getAccount = () => sessionRequest('/me', {}, { required: true })
-export const getSurveyOptions = (token) => sessionRequest('/me/preferences/options', {}, { required: true, token })
-export const getPreferences = (token) => sessionRequest('/me/preferences', {}, { required: true, token })
-export const putPreferences = (tags, token) => sessionRequest('/me/preferences', {
+export const getSurveyOptions = () => sessionRequest('/me/preferences/options', {}, { required: true })
+export const getPreferences = () => sessionRequest('/me/preferences', {}, { required: true })
+export const putPreferences = (tags) => sessionRequest('/me/preferences', {
   method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
-}, { required: true, token })
-export const getSavedPlaces = (token) => sessionRequest('/me/saved-places', {}, { required: true, token })
-export const setPlaceSaved = (id, saved, token) => sessionRequest(`/me/saved-places/${encodeURIComponent(id)}`,
-  { method: saved ? 'PUT' : 'DELETE' }, { required: true, token })
+}, { required: true })
+export const getSavedPlaces = () => sessionRequest('/me/saved-places', {}, { required: true })
+export const setPlaceSaved = (id, saved) => sessionRequest(`/me/saved-places/${encodeURIComponent(id)}`,
+  { method: saved ? 'PUT' : 'DELETE' }, { required: true })
 export const getTags = () => request('/tags')
 export const getPlace = (id) => sessionRequest(`/places/${encodeURIComponent(id)}`)
 export function getPlaces(tags = [], q = '') {

@@ -1,8 +1,9 @@
 import { Link as RouterLink } from 'react-router-dom'
 import { Box, Container, HStack, Image, Link, Text } from '@chakra-ui/react'
 import { LuMapPin } from 'react-icons/lu'
+import NavigationLinks from './NavigationLinks.jsx'
 
-export default function SiteHeader() {
+export default function SiteHeader({ activeTab }) {
   return (
     <Box as="header" bg="bg.panel" borderBottomWidth="1px">
       <Container maxW="6xl" px={{ base: 5, md: 8 }}>
@@ -18,7 +19,10 @@ export default function SiteHeader() {
               </HStack>
             </RouterLink>
           </Link>
-          <HStack display={{ base: 'none', sm: 'flex' }} gap={2} color="blue.fg" bg="blue.subtle" rounded="full" px={3} py={2} fontSize="xs" fontWeight="semibold">
+          <HStack as="nav" aria-label="Main navigation" display={{ base: 'none', md: 'flex' }} gap={1}>
+            <NavigationLinks activeTab={activeTab} />
+          </HStack>
+          <HStack display={{ base: 'none', xl: 'flex' }} gap={2} color="blue.fg" bg="blue.subtle" rounded="full" px={3} py={2} fontSize="xs" fontWeight="semibold">
             <LuMapPin aria-hidden="true" />
             <Text>Singapore</Text>
           </HStack>

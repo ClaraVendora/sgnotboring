@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
-import { Avatar, Badge, Box, Button, Card, Container, Field, Heading, HStack, Input, Link, Spinner, Stack, Tabs, Text, Wrap } from '@chakra-ui/react'
-import { authConfigured, getAccount, signIn, signOut, signUp, resendConfirmation } from '../lib/api.js'
+import { Box, Button, Card, Container, Field, Heading, HStack, Icon, Input, Link, Skeleton, Spinner, Stack, Tabs, Text } from '@chakra-ui/react'
+import { LuHeart, LuLogOut } from 'react-icons/lu'
+import { authConfigured, getAccount, signIn, signUp, resendConfirmation } from '../lib/api.js'
 import { authErrorMessage, validateCredentials } from '../lib/auth.js'
 import { useSession } from '../hooks/useSession.js'
 import { usePreferences } from '../hooks/usePreferences.js'
 import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 import PlaceCard from '../components/PlaceCard.jsx'
 import SaveFeedback from '../components/SaveFeedback.jsx'
+import AccountProfileCard from '../components/AccountProfileCard.jsx'
+import PreferencesCard from '../components/PreferencesCard.jsx'
 
 export default function Profile() {
-  const { session, loading, error: sessionError, retry } = useSession()
+  const { session, loading, error: sessionError, retry, logout, logoutPending, logoutFeedback, dismissLogoutFeedback } = useSession()
   const prefs = usePreferences(session)
   const saves = useSavedPlaces()
   const [mode, setMode] = useState('login')
@@ -23,6 +26,9 @@ export default function Profile() {
   const accountKey = `${userId}:${accountAttempt}`
   const account = accountResult?.key === accountKey ? accountResult.user : null
   const accountError = accountResult?.key === accountKey ? accountResult.error : ''
+  const displayName = account?.display_name || session?.user.user_metadata?.display_name
+  const profileName = typeof displayName === 'string' && displayName.trim()
+    ? displayName.trim().slice(0, 60) : 'Singapore explorer'
   const location = useLocation()
   const navigate = useNavigate()
   // Capture callback errors before the SDK removes the URL fragment. Never render
@@ -60,6 +66,7 @@ export default function Profile() {
   const update = (key, value) => {
     setFields((previous) => ({ ...previous, [key]: value }))
     setFeedback(null)
+    dismissLogoutFeedback()
   }
 
   async function submit(event) {
@@ -106,27 +113,14 @@ export default function Profile() {
     }
   }
 
-  async function logout() {
-    setPending('logout')
-    setFeedback(null)
-    try {
-      const { error } = await signOut()
-      if (error) throw error
-      setFields({ email: '', password: '', displayName: '' })
-      setFeedback({ error: false, message: 'You have logged out.' })
-    } catch (error) {
-      setFeedback({ error: true, logout: true, message: authErrorMessage(error) })
-    } finally {
-      setPending('')
-    }
-  }
-
   return (
-    <Container maxW="lg" py={{ base: 8, md: 12 }}>
+    <Container maxW="2xl" px={{ base: 5, md: 8 }} py={{ base: 7, md: 10 }}>
       <Stack gap={6}>
         <Stack gap={2}>
-          <Heading size="3xl">Account</Heading>
-          <Text color="fg.muted">Accounts are optional. Browse and search without signing in.</Text>
+          <Heading as="h1" size="3xl" letterSpacing="-0.8px">Account</Heading>
+          <Text color="fg.muted" fontSize="sm">
+            {session ? 'Your favourite places and tastes, all in one place.' : 'Accounts are optional. Browse and search without signing in.'}
+          </Text>
         </Stack>
         {loading ? (
           <HStack role="status"><Spinner size="sm" /><Text>Checking your session…</Text></HStack>
@@ -136,30 +130,19 @@ export default function Profile() {
               {authConfigured && <Button variant="outline" onClick={retry}>Retry session</Button>}
             </Stack>}
             {callbackError && !session && <Text role="alert" color="fg.error">{callbackError}</Text>}
-            <Card.Root>
-              <Card.Body gap={5}>
-                {session ? (
-                  <>
-                    <HStack gap={4}>
-                      <Avatar.Root size="lg" colorPalette="blue">
-                        <Avatar.Fallback name={account?.display_name || 'Explorer'} />
-                      </Avatar.Root>
-                      <Stack gap={1} minW={0}>
-                        <Heading size="xl" overflowWrap="anywhere">{account?.display_name || session.user.user_metadata?.display_name || 'Singapore explorer'}</Heading>
-                        <Text color="fg.muted" overflowWrap="anywhere">{account?.email || session.user.email}</Text>
-                      </Stack>
-                    </HStack>
-                    {accountError ? (
-                      <Stack gap={2}><Text role="alert" color="fg.error">{accountError}</Text>
-                        <Button variant="outline" onClick={() => setAccountAttempt((n) => n + 1)}>Retry account</Button>
-                      </Stack>
-                    ) : <Text role="status" color="fg.muted">{account ? 'You are logged in.' : 'Loading your account…'}</Text>}
-                    <Button onClick={logout} loading={pending === 'logout'} disabled={Boolean(pending)} variant="outline">Log out</Button>
-                  </>
-                ) : (
+            {!session && logoutFeedback && <Text role={logoutFeedback.error ? 'alert' : 'status'}
+              fontSize="sm" color={logoutFeedback.error ? 'fg.error' : 'blue.fg'}>{logoutFeedback.message}</Text>}
+            {session ? (
+              <AccountProfileCard name={profileName} email={account?.email || session.user.email}
+                loading={!account && !accountError} error={accountError}
+                onRetry={() => setAccountAttempt((n) => n + 1)} />
+            ) : (
+              <Card.Root rounded="xl">
+                <Card.Body gap={5}>
                   <Tabs.Root value={mode} onValueChange={({ value }) => {
                     setMode(value)
                     setFeedback(null)
+                    dismissLogoutFeedback()
                     setFields((previous) => ({ ...previous, password: '' }))
                   }} colorPalette="blue">
                     <Tabs.List mb={5}>
@@ -196,39 +179,43 @@ export default function Profile() {
                       </Box>
                     </Tabs.Content>
                   </Tabs.Root>
-                )}
-                {feedback && (!session || feedback.logout) && <Text role={feedback.error ? 'alert' : 'status'} color={feedback.error ? 'fg.error' : 'blue.fg'}>{feedback.message}</Text>}
-              </Card.Body>
-            </Card.Root>
-            {session && <>
-              <Card.Root>
-                <Card.Body gap={4}>
-                  <HStack justify="space-between">
-                    <Heading size="xl">My preferences</Heading>
-                    {!prefs.loading && !prefs.error && <Button asChild variant="outline" size="sm">
-                      <RouterLink to="/onboarding">{prefs.preferences ? 'Edit' : 'Take survey'}</RouterLink>
-                    </Button>}
-                  </HStack>
-                  {prefs.loading ? <Text role="status">Loading preferences…</Text> : prefs.error ? <Stack gap={2}>
-                    <Text role="alert" color="fg.error">{prefs.error}</Text>
-                    <Button variant="outline" onClick={prefs.retry}>Retry preferences</Button>
-                  </Stack> : prefs.preferences?.tags.length ? <Wrap gap={2}>
-                    {prefs.preferences.tags.map((tag) => <Badge key={tag} colorPalette="blue">{tag}</Badge>)}
-                  </Wrap> : <Text color="fg.muted">No preferences selected yet. Tell us what you usually enjoy.</Text>}
+                  {feedback && <Text role={feedback.error ? 'alert' : 'status'} color={feedback.error ? 'fg.error' : 'blue.fg'}>{feedback.message}</Text>}
                 </Card.Body>
               </Card.Root>
-              <Stack gap={4}>
-                <Heading size="xl">Saved places{saves.loading || saves.loadError ? '' : ` (${saves.places.length})`}</Heading>
-                <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />
-                {saves.loading ? <Text role="status">Loading saved places…</Text> : !saves.loadError && (
-                  saves.places.length ? saves.places.map((place) =>
-                    <PlaceCard key={place.id} place={place} compact save={saves.buttonProps(place)} />)
-                    : <Card.Root><Card.Body gap={2}>
-                      <Text fontWeight="medium">Your next favourite is out there.</Text>
-                      <Text color="fg.muted">Tap a heart on a place to save it here.</Text>
-                      <Link asChild colorPalette="blue"><RouterLink to="/">Explore places</RouterLink></Link>
-                    </Card.Body></Card.Root>
+            )}
+            {session && <>
+              <PreferencesCard preferences={prefs.preferences} loading={prefs.loading}
+                error={prefs.error} onRetry={prefs.retry} />
+              <Stack as="section" aria-labelledby="saved-heading" gap={4}>
+                <Stack gap={1}>
+                  <Heading id="saved-heading" as="h2" size="xl">Saved places{saves.loading || saves.loadError ? '' : ` (${saves.places.length})`}</Heading>
+                  <Text fontSize="sm" color="fg.muted">Your shortlist for the next time you head out.</Text>
+                </Stack>
+                <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} inline />
+                {saves.loading ? <Stack role="status" gap={3}>
+                  <Text fontSize="sm" color="fg.muted">Loading saved places…</Text>
+                  <Skeleton h="24" rounded="xl" /><Skeleton h="24" rounded="xl" />
+                </Stack> : !saves.loadError && (
+                  saves.places.length ? <Stack as="ul" aria-label="Saved places" listStyleType="none" m={0} p={0} gap={3}>
+                    {saves.places.map((place) => <Box as="li" key={place.id}>
+                      <PlaceCard place={place} compact save={saves.buttonProps(place)} />
+                    </Box>)}
+                  </Stack> : <Card.Root rounded="xl"><Card.Body alignItems="center" textAlign="center" p={6} gap={3}>
+                    <Icon as={LuHeart} boxSize={7} color="blue.fg" aria-hidden="true" />
+                    <Text fontWeight="semibold">Your next favourite is out there.</Text>
+                    <Text fontSize="sm" color="fg.muted">Tap a heart on a place to save it here.</Text>
+                    <Button asChild variant="outline" colorPalette="blue" minH="44px">
+                      <RouterLink to="/">Explore places</RouterLink>
+                    </Button>
+                  </Card.Body></Card.Root>
                 )}
+              </Stack>
+              <Stack gap={3} borderTopWidth="1px" pt={5}>
+                <Button onClick={logout} loading={logoutPending} loadingText="Logging out…"
+                  disabled={Boolean(pending) || logoutPending} variant="outline" minH="44px">
+                  <LuLogOut aria-hidden="true" /> Log out
+                </Button>
+                {logoutFeedback?.error && <Text role="alert" color="fg.error" fontSize="sm">{logoutFeedback.message}</Text>}
               </Stack>
             </>}
           </>

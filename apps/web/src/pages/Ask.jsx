@@ -5,6 +5,8 @@ import AskComposer from '../components/AskComposer.jsx'
 import ChatBubble from '../components/ChatBubble.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
 import { NAV_HEIGHT } from '../components/BottomNav.jsx'
+import SaveFeedback from '../components/SaveFeedback.jsx'
+import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 
 const SUGGESTIONS = [
   'Cheap supper for 6 after midnight',
@@ -28,6 +30,7 @@ function toHistory(turns) {
 // Conversational search. The conversation lives in component state, not the URL; each send
 // posts the new message plus recent turns.
 export default function Ask() {
+  const saves = useSavedPlaces()
   const [turns, setTurns] = useState([]) // { from: 'user' | 'assistant' | 'error', text, places?, filters? }
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
@@ -63,6 +66,7 @@ export default function Ask() {
             <Text color="fg.muted">Say it how you'd text a friend. We'll pick the top 3.</Text>
           </Stack>
 
+          <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />
           {turns.length === 0 && (
             <Wrap gap={2}>
               {SUGGESTIONS.map((s) => (
@@ -96,7 +100,7 @@ export default function Ask() {
                   </Wrap>
                 )}
                 {turn.places?.map((p) => (
-                  <PlaceCard key={p.id} place={p} reason={p.reason} />
+                  <PlaceCard key={p.id} place={p} reason={p.reason} save={saves.buttonProps(p)} compact />
                 ))}
               </Stack>
             ),

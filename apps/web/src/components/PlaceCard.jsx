@@ -2,20 +2,24 @@ import { Link as RouterLink } from 'react-router-dom'
 import { Badge, Card, HStack, LinkBox, LinkOverlay, Text, Wrap } from '@chakra-ui/react'
 import { useOpenStatus } from '../hooks/useOpenStatus.js'
 import PlacePhoto from './PlacePhoto.jsx'
+import SaveButton from './SaveButton.jsx'
 
 // `reason`: optional one-liner from /ask on why this place was picked.
-export default function PlaceCard({ place, reason }) {
+export default function PlaceCard({ place, reason, save, compact = false }) {
   const status = useOpenStatus(place?.opening_hours)
   return (
     <LinkBox as={Card.Root} overflow="hidden" _hover={{ shadow: 'md' }} transition="box-shadow 0.15s">
-      <PlacePhoto src={place.photo_url} name={place.name} />
+      {!compact && <PlacePhoto src={place.photo_url} name={place.name} />}
       <Card.Body gap={2}>
-        <Card.Title>
-          <LinkOverlay asChild>
-            <RouterLink to={`/places/${place.id}`}>{place.name}</RouterLink>
-          </LinkOverlay>
-        </Card.Title>
-        <HStack gap={3} fontSize="sm" color="fg.muted">
+        <HStack justify="space-between" align="start" gap={3}>
+          <Card.Title flex="1">
+            <LinkOverlay asChild>
+              <RouterLink to={`/places/${place.id}`}>{place.name}</RouterLink>
+            </LinkOverlay>
+          </Card.Title>
+          {save && <SaveButton name={place.name} {...save} />}
+        </HStack>
+        <HStack gap={3} flexWrap="wrap" fontSize="sm" color="fg.muted">
           {place.rating != null && <Text>★ {place.rating} ({place.user_ratings_total ?? 0})</Text>}
           {place.price_level != null && <Text>{place.price_level === 0 ? 'Free' : '$'.repeat(place.price_level)}</Text>}
           <Badge colorPalette={status.color} variant="subtle">
@@ -28,9 +32,9 @@ export default function PlaceCard({ place, reason }) {
             {reason}
           </Text>
         )}
-        {place.summary && <Card.Description>{place.summary}</Card.Description>}
+        {!compact && place.summary && <Card.Description>{place.summary}</Card.Description>}
         <Wrap gap={1}>
-          {place.tags.map((t) => (
+          {(compact ? place.tags.slice(0, 3) : place.tags).map((t) => (
             <Badge key={t} variant="outline" size="sm">
               {t}
             </Badge>

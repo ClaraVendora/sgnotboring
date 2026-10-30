@@ -9,6 +9,7 @@
     "start": "node src/server.js",
     "test": "node --test",
     "test:auth:local": "RUN_LOCAL_AUTH_TEST=1 node --test src/routes/me.test.js src/services/auth.integration.test.js",
+    "test:personalisation:local": "RUN_LOCAL_PERSONALISATION_TEST=1 node --test src/routes/personalisation.test.js src/services/personalisation.integration.test.js",
     "enrich": "node src/scripts/enrich.js",
     "ingest": "node src/scripts/ingest.js"
   },

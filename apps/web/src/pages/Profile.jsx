@@ -1,68 +1,26 @@
 import { useEffect, useState } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
-import { Avatar, Box, Button, Card, Container, Field, Heading, HStack, Input, Link, Spinner, Stack, Tabs, Text } from '@chakra-ui/react'
-import { authConfigured, getAccount, getSession, onAuthStateChange, signIn, signOut, signUp, resendConfirmation } from '../lib/api.js'
+import { Avatar, Badge, Box, Button, Card, Container, Field, Heading, HStack, Input, Link, Spinner, Stack, Tabs, Text, Wrap } from '@chakra-ui/react'
+import { authConfigured, getAccount, signIn, signOut, signUp, resendConfirmation } from '../lib/api.js'
 import { authErrorMessage, validateCredentials } from '../lib/auth.js'
-
-// Move to hooks/useSession.js once a second page needs the session (CLAUDE.md: hooks/).
-function useSession() {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(authConfigured)
-  const [error, setError] = useState(authConfigured ? '' : authErrorMessage({ code: 'auth_not_configured' }))
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(() => {
-    let active = true
-    let subscription
-    let authEventReceived = false
-    if (!authConfigured) return
-    try {
-      subscription = onAuthStateChange((_event, nextSession) => {
-        if (!active) return
-        authEventReceived = true
-        setSession(nextSession)
-        setError('')
-        setLoading(false)
-      }).data.subscription
-      getSession().then(({ data, error: sessionError }) => {
-        if (!active) return
-        if (sessionError) setError(authErrorMessage(sessionError))
-        if (!authEventReceived) setSession(data?.session ?? null)
-        setLoading(false)
-      }).catch((error) => {
-        if (!active) return
-        setError(authErrorMessage(error))
-        setLoading(false)
-      })
-    } catch (error) {
-      queueMicrotask(() => {
-        if (!active) return
-        setError(authErrorMessage(error))
-        setLoading(false)
-      })
-    }
-    return () => {
-      active = false
-      subscription?.unsubscribe()
-    }
-  }, [attempt])
-
-  return { session, loading, error, retry: () => {
-    setLoading(true)
-    setError('')
-    setAttempt((value) => value + 1)
-  } }
-}
+import { useSession } from '../hooks/useSession.js'
+import { usePreferences } from '../hooks/usePreferences.js'
+import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
+import PlaceCard from '../components/PlaceCard.jsx'
+import SaveFeedback from '../components/SaveFeedback.jsx'
 
 export default function Profile() {
   const { session, loading, error: sessionError, retry } = useSession()
+  const prefs = usePreferences(session)
+  const saves = useSavedPlaces()
   const [mode, setMode] = useState('login')
   const [fields, setFields] = useState({ email: '', password: '', displayName: '' })
   const [pending, setPending] = useState('')
   const [feedback, setFeedback] = useState(null)
   const [accountResult, setAccountResult] = useState(null)
   const [accountAttempt, setAccountAttempt] = useState(0)
-  const accountKey = `${session?.user.id}:${session?.access_token}:${accountAttempt}`
+  const userId = session?.user.id
+  const accountKey = `${userId}:${accountAttempt}`
   const account = accountResult?.key === accountKey ? accountResult.user : null
   const accountError = accountResult?.key === accountKey ? accountResult.error : ''
   const location = useLocation()
@@ -77,15 +35,18 @@ export default function Profile() {
       ? authErrorMessage({ code: code || 'otp_expired' }) : ''
   })
 
+  // Only a first-time confirmation (no survey answers yet) opens the survey; anyone who
+  // already has preferences lands on Account.
+  const firstTime = !prefs.loading && !prefs.preferences
   useEffect(() => {
-    if (!loading && location.pathname === '/auth/callback') {
-      navigate('/profile', { replace: true })
-    }
-  }, [loading, location.pathname, navigate])
+    if (loading || location.pathname !== '/auth/callback') return
+    if (!session || callbackError) navigate('/profile', { replace: true })
+    else if (!prefs.loading) navigate(firstTime ? '/onboarding' : '/profile', { replace: true })
+  }, [loading, session, callbackError, prefs.loading, firstTime, location.pathname, navigate])
 
   useEffect(() => {
     let active = true
-    if (!session) return
+    if (!userId) return
     getAccount().then(({ user }) => {
       if (active) setAccountResult({ key: accountKey, user, error: '' })
     }).catch((error) => {
@@ -94,7 +55,7 @@ export default function Profile() {
         : 'Could not load your account. Check your connection and retry.' })
     })
     return () => { active = false }
-  }, [session, accountKey])
+  }, [userId, accountKey])
 
   const update = (key, value) => {
     setFields((previous) => ({ ...previous, [key]: value }))
@@ -119,6 +80,7 @@ export default function Profile() {
         // Supabase intentionally obscures duplicate registrations.
         setFeedback({ error: false, message: 'Check your email for a confirmation link. If you already have an account, log in instead.' })
       }
+      if (mode === 'signup' && data.session) navigate('/onboarding')
     } catch (error) {
       setFeedback({ error: true, message: authErrorMessage(error) })
     } finally {
@@ -238,6 +200,37 @@ export default function Profile() {
                 {feedback && (!session || feedback.logout) && <Text role={feedback.error ? 'alert' : 'status'} color={feedback.error ? 'fg.error' : 'blue.fg'}>{feedback.message}</Text>}
               </Card.Body>
             </Card.Root>
+            {session && <>
+              <Card.Root>
+                <Card.Body gap={4}>
+                  <HStack justify="space-between">
+                    <Heading size="xl">My preferences</Heading>
+                    {!prefs.loading && !prefs.error && <Button asChild variant="outline" size="sm">
+                      <RouterLink to="/onboarding">{prefs.preferences ? 'Edit' : 'Take survey'}</RouterLink>
+                    </Button>}
+                  </HStack>
+                  {prefs.loading ? <Text role="status">Loading preferences…</Text> : prefs.error ? <Stack gap={2}>
+                    <Text role="alert" color="fg.error">{prefs.error}</Text>
+                    <Button variant="outline" onClick={prefs.retry}>Retry preferences</Button>
+                  </Stack> : prefs.preferences?.tags.length ? <Wrap gap={2}>
+                    {prefs.preferences.tags.map((tag) => <Badge key={tag} colorPalette="blue">{tag}</Badge>)}
+                  </Wrap> : <Text color="fg.muted">No preferences selected yet. Tell us what you usually enjoy.</Text>}
+                </Card.Body>
+              </Card.Root>
+              <Stack gap={4}>
+                <Heading size="xl">Saved places{saves.loading || saves.loadError ? '' : ` (${saves.places.length})`}</Heading>
+                <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />
+                {saves.loading ? <Text role="status">Loading saved places…</Text> : !saves.loadError && (
+                  saves.places.length ? saves.places.map((place) =>
+                    <PlaceCard key={place.id} place={place} compact save={saves.buttonProps(place)} />)
+                    : <Card.Root><Card.Body gap={2}>
+                      <Text fontWeight="medium">Your next favourite is out there.</Text>
+                      <Text color="fg.muted">Tap a heart on a place to save it here.</Text>
+                      <Link asChild colorPalette="blue"><RouterLink to="/">Explore places</RouterLink></Link>
+                    </Card.Body></Card.Root>
+                )}
+              </Stack>
+            </>}
           </>
         )}
         <Link asChild colorPalette="blue"><RouterLink to="/">Continue browsing places →</RouterLink></Link>

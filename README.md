@@ -155,7 +155,7 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 ```
 apps/
   api/                  Fastify backend
-    src/routes/         health.js, places.js (GET /places, /places/:id, /tags), ask.js (POST /ask), me.js (GET /me)
+    src/routes/         health.js, places.js (GET /places, /places/:id, /tags), ask.js (POST /ask), me.js (account/preferences/saves)
     src/services/       supabase.js, auth.js (verified user), llm.js (Gemini), tags.js (tag vocabulary)
     src/hooks/          require-user.js (protected endpoint pre-handler)
     src/prompts/        LLM system prompts + JSON schemas (tagging, /ask interpret + rank)
@@ -164,8 +164,8 @@ apps/
     Dockerfile          dev + prod stages
     railway.json
   web/                  React + Vite + Chakra UI
-    src/App.jsx         routes: / · /ask · /profile · /auth/callback · /places/:id · * + bottom tab bar
-    src/pages/          Home (tag filter via ?tags=), Ask (chat search), Profile, PlaceDetail, NotFound
+    src/App.jsx         routes: / · /ask · /profile · /onboarding · /auth/callback · /places/:id · * + bottom tab bar
+    src/pages/          Home (tag filter via ?tags=), Ask (chat search), Profile, Onboarding, PlaceDetail, NotFound
     src/components/     BottomNav, TagFilter, PlaceCard, ChatBubble, AskComposer
     src/lib/            api.js (API client), hours.js (open/closed from Google hours)
     Dockerfile          dev + build + nginx prod stages
@@ -190,8 +190,9 @@ the router picks the screen in the browser.
 |---|---|---|
 | `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
 | `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation is component state, not URL |
-| `/profile` | Account | email/password signup, login, verified name/email and logout; Supabase persists sessions across refreshes |
-| `/auth/callback` | Email confirmation | processes the Supabase confirmation response and replaces the URL with `/profile` |
+| `/profile` | Account | signup/login, verified identity, My preferences and Saved places; Supabase persists sessions across refreshes |
+| `/onboarding` | Taste survey | four optional chip questions; Skip leaves stored preferences unchanged, Finish saves, Account → Edit restores selections |
+| `/auth/callback` | Email confirmation | valid confirmation opens `/onboarding`; errors return to `/profile` |
 | `/places/:id` | PlaceDetail | one place |
 | `*` | NotFound | |
 
@@ -204,6 +205,48 @@ open http://127.0.0.1:54324 to receive test messages. After changing local Auth 
 Supabase without resetting the database. Hosted staging/production need separate Dashboard configuration.
 `GET /me` verifies the Supabase JWT and returns only the current user's identity; guest discovery remains public.
 Run `npm test -w api` for unit tests and `npm run test:auth:local -w api` for the opt-in local email/token workflow.
+
+### Taste survey and saved places (SGN-014 / SGN-015)
+
+After signup confirmation, choose usual places, one budget, dietary needs and dining
+companions. Every answer is a canonical vocabulary tag. Skip creates no preference row
+for a new user; when editing, Skip preserves the previous answers. Finish replaces the
+user's choices (an empty selection is allowed). Account shows tags and a pre-filled Edit link.
+
+Hearts on discovery cards, AI result cards and place details save immediately, disable
+repeat taps while pending, and roll back with visible feedback on failure. Guests see a
+login prompt; guest saves are never written to local storage. Account lists compact saved
+cards with a count and empty state. Authenticated state is discarded on account changes.
+
+| API | Behavior |
+|---|---|
+| `GET /me/preferences/options` | Four questions with labels and canonical tag values |
+| `GET /me/preferences` | `{ preferences: null }` or the current user's tags/timestamps |
+| `PUT /me/preferences` | `{ tags: [...] }`; replace choices, reject unknown/duplicate tags or multiple budgets |
+| `GET /me/saved-places` | `{ places: [...], count }`, newest first |
+| `PUT /me/saved-places/:id` | Idempotent save; missing catalogue place returns 404 |
+| `DELETE /me/saved-places/:id` | Idempotent removal |
+
+All `/me/*` routes require a verified, confirmed Supabase user. Ownership comes from the
+JWT, never a supplied user ID. `GET /places`, `GET /places/:id` and `POST /ask` include
+`saved` flags; guests receive `false`. A supplied invalid token returns 401 rather than
+falling back to guest mode. User-specific responses use `Cache-Control: no-store`.
+Both new tables have owner RLS and cascading foreign keys. `No pork` and `Family Friendly`
+are added by `20261026031535_create_preferences_and_saved_places.sql`.
+No new environment variables. AI personalisation/ranking (SGN-012) remains a separate story.
+
+With local Supabase and both dev servers running and `.env` configured:
+
+```sh
+npm run test:personalisation:local -w api  # real JWTs, two users, direct RLS and API checks
+npx playwright install chromium         # one-time browser install
+npm run test:e2e:local -w web             # signup, skip/edit, hearts, failures and account switch
+```
+
+Tests are guarded to localhost, create temporary users and clean them up. The AI-card UI
+test stubs Gemini's response while saves still use the real API/database. Screenshots
+are written under ignored `apps/web/test-results/`; traces are disabled to avoid recording
+auth tokens. Full scope and acceptance evidence: [SGN-014/015 notes](docs/kejia-sgn-014-015.md).
 
 ## 8. How tagging and Ask work
 

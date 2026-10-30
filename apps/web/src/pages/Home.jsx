@@ -5,11 +5,14 @@ import { getPlaces, getTags } from '../lib/api.js'
 import PlaceSearch from '../components/PlaceSearch.jsx'
 import TagFilter from '../components/TagFilter.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
+import SaveFeedback from '../components/SaveFeedback.jsx'
+import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 
 // Selected tags live in the URL (?tags=Late%20Night,Spicy) so filtered views are
 // shareable and the back button works. Search (?q=) replaces the current entry instead,
 // so each pause while typing doesn't cost a Back press.
 export default function Home() {
+  const saves = useSavedPlaces()
   const [searchParams, setSearchParams] = useSearchParams()
   const selected = (searchParams.get('tags') ?? '').split(',').filter(Boolean)
 
@@ -84,6 +87,7 @@ export default function Home() {
           </Text>
         </HStack>
         {error && <Text color="fg.error">Couldn't load places: {error}</Text>}
+        <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />
         {loading && <Spinner />}
         {places?.length === 0 && (
           <Text color="fg.muted">
@@ -93,7 +97,7 @@ export default function Home() {
         {places?.length > 0 && (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
             {places.map((p) => (
-              <PlaceCard key={p.id} place={p} />
+              <PlaceCard key={p.id} place={p} save={saves.buttonProps(p)} />
             ))}
           </SimpleGrid>
         )}

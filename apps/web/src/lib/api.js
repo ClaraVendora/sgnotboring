@@ -48,23 +48,47 @@ async function request(path, options) {
   return res.json()
 }
 
-const postJson = (path, body) =>
-  request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+// Reads the current access token on every call, so a routine refresh is picked up without
+// callers tracking tokens. Guest-capable calls (required: false) fall back to a guest
+// request when the session cannot be read or the API rejects the token.
+async function sessionRequest(path, options = {}, { required = false } = {}) {
+  let token
+  if (authConfigured) {
+    const { data, error } = await getSession()
+    if (error && required) throw error
+    token = data?.session?.access_token
+  }
+  if (required && !token) throw Object.assign(new Error('Please log in again.'), { status: 401 })
+  const send = (credential) => request(path, { ...options, headers: {
+    ...options.headers, ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
+  } })
+  try {
+    return await send(token)
+  } catch (error) {
+    if (required || !token || error.status !== 401) throw error
+    return send(null)
+  }
+}
 
 export const getHealth = () => request('/health')
-export async function getAccount() {
-  const { data, error } = await getSession()
-  if (error) throw error
-  if (!data.session) throw Object.assign(new Error('Please log in again.'), { status: 401 })
-  return request('/me', { headers: { Authorization: `Bearer ${data.session.access_token}` } })
-}
+export const getAccount = () => sessionRequest('/me', {}, { required: true })
+export const getSurveyOptions = () => sessionRequest('/me/preferences/options', {}, { required: true })
+export const getPreferences = () => sessionRequest('/me/preferences', {}, { required: true })
+export const putPreferences = (tags) => sessionRequest('/me/preferences', {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
+}, { required: true })
+export const getSavedPlaces = () => sessionRequest('/me/saved-places', {}, { required: true })
+export const setPlaceSaved = (id, saved) => sessionRequest(`/me/saved-places/${encodeURIComponent(id)}`,
+  { method: saved ? 'PUT' : 'DELETE' }, { required: true })
 export const getTags = () => request('/tags')
-export const getPlace = (id) => request(`/places/${encodeURIComponent(id)}`)
+export const getPlace = (id) => sessionRequest(`/places/${encodeURIComponent(id)}`)
 export function getPlaces(tags = [], q = '') {
   const qs = new URLSearchParams()
   if (tags.length) qs.set('tags', tags.join(','))
   if (q.trim()) qs.set('q', q.trim())
-  return request(`/places?${qs}`)
+  return sessionRequest(`/places?${qs}`)
 }
 // history: earlier turns [{ role: 'user' | 'assistant', text }] so follow-ups make sense
-export const askPlaces = (message, history = []) => postJson('/ask', { message, history })
+export const askPlaces = (message, history = []) => sessionRequest('/ask', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history }),
+})

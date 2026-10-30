@@ -88,7 +88,9 @@ export function getPlaces(tags = [], q = '') {
   if (q.trim()) qs.set('q', q.trim())
   return sessionRequest(`/places?${qs}`)
 }
-// history: earlier turns [{ role: 'user' | 'assistant', text }] so follow-ups make sense
-export const askPlaces = (message, history = []) => sessionRequest('/ask', {
-  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history }),
+// history: earlier turns [{ role: 'user' | 'assistant', text }] so follow-ups make sense.
+// personalised: lean on the user's survey answers and saved places. signal: aborts the request.
+export const askPlaces = (message, history = [], { personalised = false, signal } = {}) => sessionRequest('/ask', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+  body: JSON.stringify({ message, history, ...(personalised && { personalised }) }),
 })

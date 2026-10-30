@@ -189,7 +189,7 @@ the router picks the screen in the browser.
 | Route | Screen | Notes |
 |---|---|---|
 | `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
-| `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation is component state, not URL |
+| `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation lives in memory (`AskProvider`), not the URL: it survives opening a place and switching tabs, and is cleared by New search, logging out or a refresh |
 | `/profile` | Account | signup/login, verified identity, My preferences and Saved places; Supabase persists sessions across refreshes |
 | `/onboarding` | Taste survey | four optional chip questions; Skip leaves stored preferences unchanged, Finish saves, Account → Edit restores selections |
 | `/auth/callback` | Email confirmation | valid confirmation opens `/onboarding`; errors return to `/profile` |
@@ -233,14 +233,15 @@ JWT, never a supplied user ID. `GET /places`, `GET /places/:id` and `POST /ask` 
 falling back to guest mode. User-specific responses use `Cache-Control: no-store`.
 Both new tables have owner RLS and cascading foreign keys. `No pork` and `Family Friendly`
 are added by `20261026031535_create_preferences_and_saved_places.sql`.
-No new environment variables. AI personalisation/ranking (SGN-012) remains a separate story.
+No new environment variables. AI Search uses them through the Personalised toggle (SGN-012, below).
 
 With local Supabase and both dev servers running and `.env` configured:
 
 ```sh
 npm run test:personalisation:local -w api  # real JWTs, two users, direct RLS and API checks
 npx playwright install chromium         # one-time browser install
-npm run test:e2e:local -w web             # signup, skip/edit, hearts, failures and account switch
+npm run test:e2e:local -w web             # signup, skip/edit, hearts, failures and account switch; AI Search recovery,
+                                          # conversation and Personalised (/ask stubbed). E2E_BASE_URL / E2E_API_URL change ports
 ```
 
 Tests are guarded to localhost, create temporary users and clean them up. The AI-card UI
@@ -315,7 +316,8 @@ teammates must configure their own environment files.
 raw_places insert ──trigger──▶ places (name, hours, price, …)      status 'pending'
 npm run enrich -w api ──▶ Gemini (batches of 10) ──▶ places.tags + summary, status 'done'
 
-POST /ask { message, history }
+POST /ask { message, history, personalised? }
+  0. "ignore your instructions…"-style messages get a fixed refusal, no Gemini call
   1. Gemini "interpret" → must_tags (all required), want_tags (scored), count (default 3)
   2. search_places() SQL function → up to 20 candidates; loosens filters if too few
   3. Gemini "rank" → top `count` with a one-line reason each (falls back to search order on error)
@@ -395,3 +397,31 @@ npm run build
 ```
 
 Existing API auth integration tests remain opt-in through `test:auth:local`.
+
+### AI Search recovery, personalisation and conversation (SGN-011 / SGN-012 / SGN-019)
+
+- **Recovery.** "New search" (shown once there is a conversation) clears it back to the example
+  prompts. A failed request, or one taking over 20 s (aborted in the browser), keeps the message
+  and shows an inline alert with Retry, which resends the same message and earlier turns; 429 and
+  503 get their own wording. When no shown place meets every hard requirement, the reply starts
+  with plain advice built from what was asked (`services/no-match.js`: budget, time, an area the
+  shown places are in (a fixed neighbour list first), a later time with open now), e.g. "Nothing
+  fits all of that. Try raising the budget or a nearby area such as Tanjong Pagar." Close matches
+  still follow. When only some do, it starts "Only 2 of these fit everything you asked for." and
+  lists those first. Rule-change attempts get a one-line refusal
+  (`prompts/ask.js`, plus an instruction in the interpret prompt for subtler ones).
+- **Personalised.** `POST /ask` accepts `personalised: true`. With a valid user it loads the taste
+  survey and the most common tags among saved places (`services/personalisation.js`): survey
+  dietary needs become hard requirements unless the message opts out (`skip_saved_dietary`, asked
+  in the same interpret call), and other tastes only break ties between places the message scores
+  equally, so what the message asks for always wins. The server adds the reply's "Leaning on your
+  survey (…) and your saved places (…)." sentence from the tags, naming only tastes the user gave
+  that the picks actually have (none: no sentence). A personalised request answered as a guest's
+  (expired login) shows the toggle as off until the user logs in again. The response then has `personalisation: { status: 'on', leanings }`; otherwise
+  it is `{ status: 'logged_out' | 'empty' | 'unavailable' }` and the results are exactly a
+  guest's. Only tags reach Gemini, and it is still at most two calls. The toggle is off by
+  default and remembered per user in `localStorage`.
+- **Conversation.** `hooks/AskProvider.jsx` holds the turns, draft and in-flight request above
+  the routes, so replies land while another tab is open. The Ask page saves its scroll position
+  when left and restores it on return. The detail page's Back link goes back in history, or to
+  Home when the place was opened directly.

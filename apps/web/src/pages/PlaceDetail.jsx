@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link as RouterLink, useParams } from 'react-router-dom'
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Container, Heading, HStack, Link, Spinner, Stack, Text, Wrap } from '@chakra-ui/react'
 import { getPlace } from '../lib/api.js'
 import { useOpenStatus } from '../hooks/useOpenStatus.js'
@@ -11,9 +11,23 @@ import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 export default function PlaceDetail() {
   const saves = useSavedPlaces()
   const { id } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [result, setResult] = useState({ id: null, place: null, error: null })
   const { place, error } = result.id === id ? result : { place: null, error: null }
   const status = useOpenStatus(place?.opening_hours)
+  // Back returns to wherever the place was opened from (AI Search, Home, Account), like the
+  // browser's back button, so that page can restore itself. Opened directly: go Home.
+  const back = (event) => {
+    if (location.key === 'default') return
+    event.preventDefault()
+    navigate(-1)
+  }
+
+  // Start at the top even when opened from far down a list or conversation.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [id])
 
   useEffect(() => {
     let cancelled = false
@@ -29,7 +43,7 @@ export default function PlaceDetail() {
         <Heading size="xl">{error.status === 404 ? 'Place not found' : 'Could not load this place'}</Heading>
         <Text color="fg.error">{error.status === 404 ? 'This place may have been removed.' : error.message}</Text>
         <Link asChild mt={4} display="inline-block">
-          <RouterLink to="/">← Back</RouterLink>
+          <RouterLink to="/" onClick={back}>← Back</RouterLink>
         </Link>
       </Container>
     )
@@ -46,7 +60,7 @@ export default function PlaceDetail() {
     <Container maxW="3xl" py={10}>
       <Stack gap={4}>
         <Link asChild alignSelf="flex-start">
-          <RouterLink to="/">← Back</RouterLink>
+          <RouterLink to="/" onClick={back}>← Back</RouterLink>
         </Link>
         <HStack justify="space-between" align="start">
           <Heading size="3xl">{place.name}</Heading>

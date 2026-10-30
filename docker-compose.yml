@@ -21,6 +21,7 @@ services:
       SUPABASE_URL: http://host.docker.internal:54321
     volumes:
       - ./apps/api/src:/app/apps/api/src
+      - ./packages/shared:/app/packages/shared
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -37,6 +38,7 @@ services:
       DOCKER: "true"
     volumes:
       - ./apps/web/src:/app/apps/web/src
+      - ./packages/shared:/app/packages/shared
       - ./apps/web/index.html:/app/apps/web/index.html
       - ./apps/web/vite.config.js:/app/apps/web/vite.config.js
       - ./apps/web/public:/app/apps/web/public

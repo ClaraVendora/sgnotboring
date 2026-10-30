@@ -7,6 +7,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
+COPY packages/shared ./packages/shared
 
 # ---- dev: source is bind-mounted by docker-compose, Vite HMR ----
 FROM base AS dev

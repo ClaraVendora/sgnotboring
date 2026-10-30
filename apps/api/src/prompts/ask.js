@@ -11,6 +11,7 @@ Return:
 - want_tags: everything else that fits: place type, cuisine, vibe, occasion, drinks, features. 1-6 tags.
 - count: how many places (options, recommendations) they asked for. Default 3, max 10. A group size is not a count: "for 6", "6 pax", "a group of 6" means Group Friendly with count 3.
 - off_topic: true only if the message has nothing to do with finding somewhere to eat or drink in Singapore.
+- open_now: true only when the user wants a place open at the current moment (including earlier turns still in force). "open now", "right now", "still open", "at this hour" and "open at the moment" mean this constraint. Turn it off if the user removes it. It is not the Late Night tag.
 - reply: if off_topic, one friendly sentence steering them back to food. Otherwise an empty string.
 
 Use only tags from the vocabulary below. Local phrasing to map:
@@ -41,9 +42,10 @@ export function interpretSchema(tagNames) {
       want_tags: tagList(8),
       count: { type: 'integer', minimum: 1, maximum: 10 },
       off_topic: { type: 'boolean' },
+      open_now: { type: 'boolean' },
       reply: { type: 'string' },
     },
-    required: ['intent', 'must_tags', 'want_tags', 'count', 'off_topic', 'reply'],
+    required: ['intent', 'must_tags', 'want_tags', 'count', 'off_topic', 'open_now', 'reply'],
   }
 }
 
@@ -56,13 +58,15 @@ Rules:
 - Order best first. How well a place fits the request (tags, summary) matters more than its rating; use rating and ratingCount to break ties.
 - reason: one sentence, at most 25 words, telling the user why this place fits what they asked for. Only facts from the candidate data. Don't start with the place name.
 - reply: one short, friendly sentence introducing the picks. Casual Singaporean voice; light Singlish is fine, don't overdo it.
+- If open_now is true, the server has already excluded closed and unknown-hours places. Restate "open right now" in the reply. Do not invent opening times.
 - If there is a \`note\`, only some candidates meet every requirement. Put those first, and say plainly in reply and in the other picks' reasons what they miss (e.g. "not in Holland V, but..."). Never talk about filters or tags.`
 
 // candidates: rows from search_places(); exact/dropped: from findCandidates() in routes/ask.js.
-export function rankInput({ intent, count, exact, dropped, candidates }) {
+export function rankInput({ intent, count, exact, dropped, candidates, openNow = false }) {
   return JSON.stringify({
     request: intent,
     count,
+    open_now: openNow,
     note: dropped.length
       ? `Only ${exact} candidate(s) meet every requirement. The others are close matches that miss: ${dropped.join(', ')}.`
       : undefined,

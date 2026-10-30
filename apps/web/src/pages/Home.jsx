@@ -92,8 +92,8 @@ export default function Home() {
                 })
               }}>Clear filters</Button>}
             </HStack>
+            {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
             <Box id="all-tag-filters" hidden={!moreFilters}>
-              {tagsError && <Text role="alert" color="fg.error">Could not load tag filters. Refresh to try again.</Text>}
               <TagFilter tags={[...new Set([...tags, ...selected])].sort()} selected={selected}
                 onToggle={toggle} onClear={() => updateParam('tags', '')} />
             </Box>

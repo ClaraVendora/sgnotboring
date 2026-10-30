@@ -41,10 +41,17 @@ export async function searchCandidates(must, want, { openNow = false, at = new D
   return data.map((place) => ({ ...place, photo_url: photoById.get(place.id) ?? null }))
 }
 
-export async function findNextOpening(must, at, db = supabase) {
+// Earliest known opening among places with every must tag, limited to those that best match
+// the wanted tags: a cafe request should not suggest a bar just because it opens sooner.
+export async function findNextOpening(must, want, at, db = supabase) {
+  const wanted = new Set(want)
   const upcoming = (await taggedPlaces(must, db))
-    .map((place) => ({ name: place.name, opensAt: nextOpening(place.opening_hours, at) }))
+    .map((place) => ({
+      name: place.name, opensAt: nextOpening(place.opening_hours, at),
+      score: (place.tags ?? []).filter((tag) => wanted.has(tag)).length,
+    }))
     .filter((place) => place.opensAt)
-    .sort((a, b) => a.opensAt - b.opensAt)
-  return upcoming[0] ?? null
+  const best = Math.max(0, ...upcoming.map((place) => place.score))
+  const [next] = upcoming.filter((place) => place.score === best).sort((a, b) => a.opensAt - b.opensAt)
+  return next ? { name: next.name, opensAt: next.opensAt } : null
 }

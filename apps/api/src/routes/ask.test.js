@@ -58,3 +58,36 @@ test('ordinary requests and explicit removal of open-now preserve unrestricted b
     assert.equal(res.json().filters.open_now, false)
   }
 })
+
+test('negated open-now phrases override the model and keep results unrestricted', async (t) => {
+  const app = Fastify()
+  t.after(() => app.close())
+  await app.register(askRoutes, {
+    vocabulary, candidatesFor: async (_must, _want, options) => { assert.equal(options.openNow, false); return [] },
+    generate: async () => ({ ...interpreted, open_now: true }),
+  })
+  for (const message of [
+    "I don't care if it's open right now, just a good cafe", 'Cafe for later tonight, not right now',
+    'Doesn’t matter if they’re open, any good cafe?', 'Cafe, not necessarily open right now',
+  ]) {
+    const res = await app.inject({ method: 'POST', url: '/ask', payload: { message } })
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.json().filters.open_now, false, message)
+  }
+})
+
+test('next-opening guidance is looked up for the requested tags, not just hard requirements', async (t) => {
+  const app = Fastify()
+  t.after(() => app.close())
+  await app.register(askRoutes, {
+    vocabulary, clock: () => at, generate: async () => interpreted, candidatesFor: async () => [],
+    nextOpeningFor: async (must, want, when) => {
+      assert.deepEqual(must, [])
+      assert.deepEqual(want, ['Cafe'])
+      assert.equal(when, at)
+      return null
+    },
+  })
+  const res = await app.inject({ method: 'POST', url: '/ask', payload: { message: 'Cafe open now' } })
+  assert.match(res.json().reply, /No matching places are open right now/)
+})

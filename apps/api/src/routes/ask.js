@@ -122,7 +122,7 @@ export default async function askRoutes(app, {
         applied.relaxed = dropped.length > 0
         if (!candidates.length) {
           if (openNow) return {
-            reply: noOpenPlacesReply(await nextOpeningFor(must, at)), places: [], filters: applied,
+            reply: noOpenPlacesReply(await nextOpeningFor(must, want, at)), places: [], filters: applied,
           }
           return { reply: "Couldn't find anything for that yet. Try another area or vibe?", places: [], filters: applied }
         }

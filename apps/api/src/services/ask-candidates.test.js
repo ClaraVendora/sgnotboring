@@ -41,7 +41,18 @@ test('next-opening suggestion uses the earliest known matching schedule', async 
     { name: 'Sooner', tags: ['Cafe'], opening_hours: hours(14, 17) },
     { name: 'Unknown', tags: ['Cafe'] },
   ])
-  const next = await findNextOpening(['Cafe'], at, db)
+  const next = await findNextOpening(['Cafe'], [], at, db)
   assert.equal(next.name, 'Sooner')
   assert.equal(next.opensAt.toISOString(), '2026-10-28T06:00:00.000Z')
+})
+
+test('next-opening suggestion prefers places matching the wanted tags over ones opening sooner', async () => {
+  const db = fixtureDb([
+    { name: 'Bar opens first', tags: ['Bar'], opening_hours: hours(13, 23) },
+    { name: 'Cafe', tags: ['Cafe'], opening_hours: hours(16, 20) },
+    { name: 'Cafe with wifi', tags: ['Cafe', 'Wifi'], opening_hours: hours(18, 22) },
+  ])
+  assert.equal((await findNextOpening([], ['Cafe'], at, db)).name, 'Cafe')
+  assert.equal((await findNextOpening([], ['Cafe', 'Wifi'], at, db)).name, 'Cafe with wifi')
+  assert.equal((await findNextOpening([], ['Dessert'], at, db)).name, 'Bar opens first')
 })

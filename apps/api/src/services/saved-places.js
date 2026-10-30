@@ -32,6 +32,12 @@ export function createSavedPlacesService(db = supabase) {
       const { error } = await db.from('saved_places').delete().eq('user_id', userId).eq('place_id', placeId)
       if (error) throw error
     },
+    // Tag lists of the user's saved places, for personalised AI Search.
+    async tags(userId) {
+      const { data, error } = await db.from('saved_places').select('place:places(tags)').eq('user_id', userId)
+      if (error) throw error
+      return data.filter(({ place }) => place).map(({ place }) => place.tags ?? [])
+    },
     async annotate(places, userId) {
       if (!userId || !places.length) return places.map((place) => ({ ...place, saved: false }))
       const { data, error } = await db.from('saved_places').select('place_id')

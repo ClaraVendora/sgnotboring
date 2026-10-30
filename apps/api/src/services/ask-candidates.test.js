@@ -56,3 +56,18 @@ test('next-opening suggestion prefers places matching the wanted tags over ones 
   assert.equal((await findNextOpening([], ['Cafe', 'Wifi'], at, db)).name, 'Cafe with wifi')
   assert.equal((await findNextOpening([], ['Dessert'], at, db)).name, 'Bar opens first')
 })
+
+test('personal tastes only reorder places the request scores equally, from a wider pool', async () => {
+  const rows = [
+    { id: 'a', match_score: 2, tags: ['Bar'] }, { id: 'b', match_score: 1, tags: ['Bakery'] },
+    { id: 'c', match_score: 1, tags: ['Chill'] }, { id: 'd', match_score: 0, tags: ['Chill', 'Cafe'] },
+  ]
+  const requested = []
+  const db = { ...fixtureDb(rows), rpc: async (_name, args) => { requested.push(args.max_results); return { data: rows, error: null } } }
+  const plain = await searchCandidates([], ['Bar'], { db })
+  assert.deepEqual(plain.map((place) => place.id), ['a', 'b', 'c', 'd'])
+  const leaned = await searchCandidates([], ['Bar'], { prefer: ['Chill', 'Cafe'], db })
+  // c gains on b (equal score), but d's tastes cannot lift it above a better request match.
+  assert.deepEqual(leaned.map((place) => place.id), ['a', 'c', 'b', 'd'])
+  assert.deepEqual(requested, [20, 50])
+})

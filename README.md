@@ -186,6 +186,13 @@ turbo.json              dev / build / lint pipelines
 Client-side only (React Router). nginx (prod) and Vite (dev) return `index.html` for every path;
 the router picks the screen in the browser.
 
+At the Chakra `md` breakpoint (768px) and above, the main navigation moves into
+the header; below it, the fixed bottom tabs remain. Both use the same links and
+active state, including Account while editing the taste survey. Home keeps its
+responsive grid; Ask and Account remain centred single columns. Page padding,
+the sticky Ask composer, and save feedback share `--bottom-nav-space`, which is
+zero on desktop (SGN-005).
+
 | Route | Screen | Notes |
 |---|---|---|
 | `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
@@ -205,6 +212,14 @@ open http://127.0.0.1:54324 to receive test messages. After changing local Auth 
 Supabase without resetting the database. Hosted staging/production need separate Dashboard configuration.
 `GET /me` verifies the Supabase JWT and returns only the current user's identity; guest discovery remains public.
 Run `npm test -w api` for unit tests and `npm run test:auth:local -w api` for the opt-in local email/token workflow.
+
+The logged-in Account screen (ENG-06) has a profile card, editable preferences,
+a semantic compact saved list with a count, and Log out below the list. Each data
+section shows its own loading/error/retry state; an unavailable list never displays
+an empty count. Save feedback is inline on Account. Logout feedback lives in the
+session provider so it survives the account subtree being cleared, including when
+Auth removes the local session but cannot confirm server logout.
+See [desktop and Account acceptance checks](docs/kejia-sgn-005-eng-06.md).
 
 ### Taste survey and saved places (SGN-014 / SGN-015)
 
@@ -242,6 +257,7 @@ npm run test:personalisation:local -w api  # real JWTs, two users, direct RLS an
 npx playwright install chromium         # one-time browser install
 npm run test:e2e:local -w web             # signup, skip/edit, hearts, failures and account switch; AI Search recovery,
                                           # conversation and Personalised (/ask stubbed). E2E_BASE_URL / E2E_API_URL change ports
+npm run test:e2e:local -w web -- desktop-account.spec.js  # 375/768/1280px layout and Account state checks
 ```
 
 Tests are guarded to localhost, create temporary users and clean them up. The AI-card UI

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { Box } from '@chakra-ui/react'
+import { Flex, SkipNavContent, SkipNavLink } from '@chakra-ui/react'
 import Home from './pages/Home.jsx'
 import Ask from './pages/Ask.jsx'
 import Profile from './pages/Profile.jsx'
@@ -26,16 +26,21 @@ export default function App() {
   )
 }
 
+// Which tab each page belongs to. Routes match case-insensitively and ignore a trailing slash.
+const TAB_OF = { '/': '/', '/ask': '/ask', '/profile': '/profile', '/onboarding': '/profile', '/auth/callback': '/profile' }
+
 function AppLayout() {
   const { pathname } = useLocation()
-  const activeTab = ['/profile', '/onboarding', '/auth/callback'].includes(pathname)
-    ? '/profile' : pathname === '/ask' ? '/ask' : pathname === '/' ? '/' : null
+  const path = pathname.replace(/\/+$/, '').toLowerCase() || '/'
+  const activeTab = TAB_OF[path] ?? null
+  // Pages stretch to fill <main>, so none of them needs to know the header's height.
   return (
-    <Box minH="100dvh" css={{
+    <Flex direction="column" minH="100dvh" css={{
       '--bottom-nav-space': { base: `calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))`, md: '0px' },
     }} pb="var(--bottom-nav-space)">
-      <SiteHeader activeTab={activeTab} />
-      <Box as="main" id="main-content">
+      <SkipNavLink id="main-content" zIndex="skipNav">Skip to content</SkipNavLink>
+      <SiteHeader activeTab={activeTab} path={path} />
+      <SkipNavContent as="main" id="main-content" flex="1" display="flex" flexDirection="column">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/ask" element={<Ask />} />
@@ -45,8 +50,8 @@ function AppLayout() {
           <Route path="/places/:id" element={<PlaceDetail />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </Box>
-      <BottomNav activeTab={activeTab} />
-    </Box>
+      </SkipNavContent>
+      <BottomNav activeTab={activeTab} path={path} />
+    </Flex>
   )
 }

@@ -10,10 +10,11 @@ import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 import PlaceCard from '../components/PlaceCard.jsx'
 import SaveFeedback from '../components/SaveFeedback.jsx'
 import AccountProfileCard from '../components/AccountProfileCard.jsx'
+import FeedbackText from '../components/FeedbackText.jsx'
 import PreferencesCard from '../components/PreferencesCard.jsx'
 
 export default function Profile() {
-  const { session, loading, error: sessionError, retry, logout, logoutPending, logoutFeedback, dismissLogoutFeedback } = useSession()
+  const { session, loading, error: sessionError, retry, logout, logoutPending, logoutFeedback: logoutResult, dismissLogoutFeedback } = useSession()
   const prefs = usePreferences(session)
   const saves = useSavedPlaces()
   const [mode, setMode] = useState('login')
@@ -31,6 +32,7 @@ export default function Profile() {
     ? displayName.trim().slice(0, 60) : 'Singapore explorer'
   const location = useLocation()
   const navigate = useNavigate()
+  const logoutFeedback = logoutResult?.locationKey === location.key ? logoutResult : null
   // Capture callback errors before the SDK removes the URL fragment. Never render
   // arbitrary error descriptions from URLs.
   const [callbackError] = useState(() => {
@@ -130,8 +132,7 @@ export default function Profile() {
               {authConfigured && <Button variant="outline" onClick={retry}>Retry session</Button>}
             </Stack>}
             {callbackError && !session && <Text role="alert" color="fg.error">{callbackError}</Text>}
-            {!session && logoutFeedback && <Text role={logoutFeedback.error ? 'alert' : 'status'}
-              fontSize="sm" color={logoutFeedback.error ? 'fg.error' : 'blue.fg'}>{logoutFeedback.message}</Text>}
+            {!session && <FeedbackText feedback={logoutFeedback} fontSize="sm" />}
             {session ? (
               <AccountProfileCard name={profileName} email={account?.email || session.user.email}
                 loading={!account && !accountError} error={accountError}
@@ -179,7 +180,7 @@ export default function Profile() {
                       </Box>
                     </Tabs.Content>
                   </Tabs.Root>
-                  {feedback && <Text role={feedback.error ? 'alert' : 'status'} color={feedback.error ? 'fg.error' : 'blue.fg'}>{feedback.message}</Text>}
+                  <FeedbackText feedback={feedback} />
                 </Card.Body>
               </Card.Root>
             )}
@@ -196,7 +197,7 @@ export default function Profile() {
                   <Text fontSize="sm" color="fg.muted">Loading saved places…</Text>
                   <Skeleton h="24" rounded="xl" /><Skeleton h="24" rounded="xl" />
                 </Stack> : !saves.loadError && (
-                  saves.places.length ? <Stack as="ul" aria-label="Saved places" listStyleType="none" m={0} p={0} gap={3}>
+                  saves.places.length ? <Stack as="ul" role="list" aria-label="Saved places" listStyleType="none" m={0} p={0} gap={3}>
                     {saves.places.map((place) => <Box as="li" key={place.id}>
                       <PlaceCard place={place} compact save={saves.buttonProps(place)} />
                     </Box>)}
@@ -211,11 +212,11 @@ export default function Profile() {
                 )}
               </Stack>
               <Stack gap={3} borderTopWidth="1px" pt={5}>
-                <Button onClick={logout} loading={logoutPending} loadingText="Logging out…"
-                  disabled={Boolean(pending) || logoutPending} variant="outline" minH="44px">
+                <Button onClick={() => logout(location.key)} loading={logoutPending} loadingText="Logging out…"
+                  disabled={logoutPending} variant="outline" minH="44px">
                   <LuLogOut aria-hidden="true" /> Log out
                 </Button>
-                {logoutFeedback?.error && <Text role="alert" color="fg.error" fontSize="sm">{logoutFeedback.message}</Text>}
+                <FeedbackText feedback={logoutFeedback} fontSize="sm" />
               </Stack>
             </>}
           </>

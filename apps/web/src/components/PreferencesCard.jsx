@@ -3,6 +3,7 @@ import { Badge, Button, Card, Heading, HStack, Skeleton, Stack, Text, Wrap } fro
 import { LuPencilLine } from 'react-icons/lu'
 
 export default function PreferencesCard({ preferences, loading, error, onRetry }) {
+  const hasTags = preferences?.tags.length > 0
   return (
     <Card.Root as="section" aria-labelledby="preferences-heading" rounded="xl">
       <Card.Body p={{ base: 5, md: 6 }} gap={4}>
@@ -10,7 +11,7 @@ export default function PreferencesCard({ preferences, loading, error, onRetry }
           <Heading id="preferences-heading" as="h2" size="xl">My preferences</Heading>
           {!loading && !error && <Button asChild variant="outline" size="sm" minH="44px">
             <RouterLink to="/onboarding">
-              <LuPencilLine aria-hidden="true" />{preferences ? 'Edit' : 'Take survey'}
+              <LuPencilLine aria-hidden="true" />{hasTags ? 'Edit' : 'Take survey'}
             </RouterLink>
           </Button>}
         </HStack>
@@ -20,7 +21,7 @@ export default function PreferencesCard({ preferences, loading, error, onRetry }
         </Stack> : error ? <Stack gap={2}>
           <Text role="alert" color="fg.error" fontSize="sm">{error}</Text>
           <Button variant="outline" alignSelf="start" size="sm" onClick={onRetry}>Retry preferences</Button>
-        </Stack> : preferences?.tags.length ? <Stack gap={3}>
+        </Stack> : hasTags ? <Stack gap={3}>
           <Text fontSize="sm" color="fg.muted">Used when you turn on Personalised in Ask.</Text>
           <Wrap gap={2}>
             {preferences.tags.map((tag) => <Badge key={tag} colorPalette="blue" variant="subtle" rounded="full" px={3} py={1}>{tag}</Badge>)}

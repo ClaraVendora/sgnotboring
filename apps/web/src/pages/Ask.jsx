@@ -75,7 +75,7 @@ export default function Ask() {
   }, [turns.length, pending])
 
   return (
-    <Flex direction="column" minH="calc(100dvh - 81px - var(--bottom-nav-space))">
+    <Flex direction="column" flex="1">
       <Container maxW="lg" flex="1" pt={6} pb={4} px={4}>
         <Stack gap={4}>
           <HStack justify="space-between" align="start" gap={3}>

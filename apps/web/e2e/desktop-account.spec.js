@@ -34,7 +34,9 @@ async function noOverflow(page) {
 }
 test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: 'ignoreErrors' })
-  for (const id of users.splice(0)) expect((await admin.auth.admin.deleteUser(id)).error).toBeNull()
+  // Delete every user before asserting, so one failure does not leak the rest.
+  const results = await Promise.all(users.splice(0).map((id) => admin.auth.admin.deleteUser(id)))
+  expect(results.map(({ error }) => error)).toEqual(results.map(() => null))
 })
 
 for (const width of [375, 768, 1280]) {
@@ -124,7 +126,8 @@ test('Account profile, preferences, compact saved list and logout work at all ta
   }
   await prefs.getByRole('link', { name: 'Edit', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Cafes', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('navigation').getByRole('link', { name: 'Account', exact: true })).toHaveAttribute('aria-current', 'page')
+  // The survey is part of the Account section but is not the Account page itself.
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Account', exact: true })).toHaveAttribute('aria-current', 'true')
   await page.getByRole('button', { name: 'Skip', exact: true }).click()
   // Preserve link behavior: the heart removes, the name opens the place.
   await saved.getByRole('button', { name: `Unsave ${places[0].name}`, exact: true }).click()
@@ -143,6 +146,11 @@ test('Account profile, preferences, compact saved list and logout work at all ta
   await expect(page.getByText('You have logged out.', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Your profile' })).toHaveCount(0)
   await expect(page.getByText(user.email, { exact: true })).toHaveCount(0)
+  // The message belongs to that logout, not to every later visit to Account.
+  await page.getByRole('navigation').getByRole('link', { name: 'Discover', exact: true }).click()
+  await page.getByRole('navigation').getByRole('link', { name: 'Account', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible()
+  await expect(page.getByText('You have logged out.', { exact: true })).toHaveCount(0)
 })
 
 test('Account errors are local to each section, recover on Retry, and logout failure stays visible', async ({ page }) => {
@@ -175,6 +183,8 @@ test('Account errors are local to each section, recover on Retry, and logout fai
 
 test('Account loading states never show a false empty list, and logout remains usable', async ({ page }) => {
   const user = await account()
+  // Finishing the survey with nothing selected stores an empty answer.
+  expect((await admin.from('preferences').insert({ user_id: user.id, tags: [] })).error).toBeNull()
   let release
   const gate = new Promise((resolve) => { release = resolve })
   for (const endpoint of ['/me', '/me/preferences', '/me/saved-places']) {
@@ -189,4 +199,19 @@ test('Account loading states never show a false empty list, and logout remains u
   release()
   await expect(page.getByText('Your next favourite is out there.')).toBeVisible()
   await expect(page.getByText('Loading your account…')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Take survey', exact: true })).toBeVisible()
+})
+
+test('active tab follows any spelling of a route, and the skip link jumps past navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  for (const [url, name] of [['/profile/', 'Account'], ['/Ask', 'Ask']]) {
+    await page.goto(url)
+    await expect(page.getByRole('navigation').getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page')
+  }
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Skip to content', exact: true })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('main')).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Ask', exact: true })).not.toBeFocused()
 })

@@ -3,7 +3,7 @@ import { Box, Container, HStack, Image, Link, Text } from '@chakra-ui/react'
 import { LuMapPin } from 'react-icons/lu'
 import NavigationLinks from './NavigationLinks.jsx'
 
-export default function SiteHeader({ activeTab }) {
+export default function SiteHeader({ activeTab, path }) {
   return (
     <Box as="header" bg="bg.panel" borderBottomWidth="1px">
       <Container maxW="6xl" px={{ base: 5, md: 8 }}>
@@ -20,7 +20,7 @@ export default function SiteHeader({ activeTab }) {
             </RouterLink>
           </Link>
           <HStack as="nav" aria-label="Main navigation" display={{ base: 'none', md: 'flex' }} gap={1}>
-            <NavigationLinks activeTab={activeTab} />
+            <NavigationLinks activeTab={activeTab} path={path} />
           </HStack>
           <HStack display={{ base: 'none', xl: 'flex' }} gap={2} color="blue.fg" bg="blue.subtle" rounded="full" px={3} py={2} fontSize="xs" fontWeight="semibold">
             <LuMapPin aria-hidden="true" />

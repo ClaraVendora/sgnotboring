@@ -5,7 +5,7 @@ import NavigationLinks from './NavigationLinks.jsx'
 export const NAV_HEIGHT = '64px'
 
 // Hidden (including from the keyboard/accessibility tree) at the desktop breakpoint.
-export default function BottomNav({ activeTab }) {
+export default function BottomNav({ activeTab, path }) {
   return (
     <Box
       as="nav"
@@ -20,7 +20,7 @@ export default function BottomNav({ activeTab }) {
       pb="env(safe-area-inset-bottom)"
     >
       <Flex maxW="lg" mx="auto" h={NAV_HEIGHT} gap={2} px={3} py={2}>
-        <NavigationLinks activeTab={activeTab} compact />
+        <NavigationLinks activeTab={activeTab} path={path} compact />
       </Flex>
     </Box>
   )

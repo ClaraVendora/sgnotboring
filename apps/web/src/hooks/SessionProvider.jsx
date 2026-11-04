@@ -51,7 +51,9 @@ export function SessionProvider({ children }) {
 
   // Account content is remounted when Auth emits SIGNED_OUT. Keep the operation
   // result above that boundary, including SDK errors that still clear local state.
-  async function logout() {
+  // `locationKey` ties the result to the history entry it belongs to, so it is not
+  // shown again on a later visit to Account.
+  async function logout(locationKey) {
     if (signingOut.current) return
     signingOut.current = true
     setLogoutPending(true)
@@ -59,10 +61,12 @@ export function SessionProvider({ children }) {
     try {
       const { error } = await signOut()
       if (error) throw error
-      setLogoutFeedback({ error: false, message: 'You have logged out.' })
+      setLogoutFeedback({ locationKey, error: false, message: 'You have logged out.' })
     } catch (error) {
-      const current = await getSession().catch(() => null)
-      setLogoutFeedback({ error: true, message: current?.data?.session === null
+      // signOut keeps the session when it cannot load it (e.g. offline with an expired token);
+      // getSession then also errors, so only an error-free empty session means it was cleared.
+      const current = await getSession().catch((sessionError) => ({ error: sessionError }))
+      setLogoutFeedback({ locationKey, error: true, message: !current.error && !current.data.session
         ? 'You are logged out on this device, but the server could not confirm logout. Log in again to retry.'
         : authErrorMessage(error) })
     } finally {

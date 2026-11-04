@@ -12,3 +12,10 @@ export const QUICK_FILTERS = [
 export function filterOpenPlaces(places, openNow, now = new Date()) {
   return openNow ? places.filter((place) => isOpenNow(place.opening_hours, now)) : places
 }
+
+const nameOrder = new Intl.Collator('en-SG', { sensitivity: 'base', numeric: true })
+export function sortPlaces(places, sort) {
+  if (sort !== 'az' && sort !== 'za') return places
+  return [...places].sort((a, b) => (sort === 'za' ? -1 : 1) * nameOrder.compare(a.name ?? '', b.name ?? '')
+    || String(a.id).localeCompare(String(b.id)))
+}

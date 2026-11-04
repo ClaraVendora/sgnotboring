@@ -1,6 +1,8 @@
 import { supabase } from '../services/supabase.js'
 import { searchPlaces } from '../services/places.js'
-import { createOptionalUser } from '../hooks/require-user.js'
+import { createOptionalUser, createRequireUser } from '../hooks/require-user.js'
+import { createReviewsService } from '../services/reviews.js'
+import { reviewBodySchema } from '../schemas/review.js'
 import { createSavedPlacesService, withSavedFlags } from '../services/saved-places.js'
 
 export default async function placesRoutes(app, options = {}) {
@@ -9,6 +11,39 @@ export default async function placesRoutes(app, options = {}) {
   const savedPlaces = options.savedPlaces ?? createSavedPlacesService()
   const search = options.searchPlaces ?? searchPlaces
   const db = options.db ?? supabase
+  const reviews = options.reviews ?? createReviewsService(db)
+  const requireUser = createRequireUser(options.verifyUser)
+  const reviewParams = {
+    type: 'object', required: ['id'], additionalProperties: false,
+    properties: { id: { type: 'string', format: 'uuid' } },
+  }
+
+  app.get('/places/:id/reviews', { schema: { params: reviewParams } }, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store')
+    try {
+      const rows = await reviews.list(req.params.id)
+      if (rows === null) return reply.code(404).send({ error: 'Place not found' })
+      return { reviews: rows }
+    } catch (error) {
+      req.log.error(error, 'Could not load reviews')
+      return reply.code(500).send({ error: 'Could not load reviews' })
+    }
+  })
+
+  // One review per person/place. The verified session always supplies ownership;
+  // a caller cannot choose another author's user_id or review ID to edit.
+  app.put('/places/:id/review', {
+    preHandler: requireUser,
+    schema: { params: reviewParams, body: reviewBodySchema },
+  }, async (req, reply) => {
+    try {
+      return { review: await reviews.save(req.params.id, req.user, req.body.body.trim(), req.body.rating) }
+    } catch (error) {
+      if (error.code === '23503') return reply.code(404).send({ error: 'Place not found' })
+      req.log.error(error, 'Could not save review')
+      return reply.code(500).send({ error: 'Could not save review' })
+    }
+  })
   // GET /places?tags=Late%20Night,Spicy  → places matching ANY of the tags
   app.get(
     '/places',

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { Box, Button, Card, Container, Field, Heading, HStack, Icon, Input, Link, Skeleton, Spinner, Stack, Tabs, Text } from '@chakra-ui/react'
 import { LuHeart, LuLogOut } from 'react-icons/lu'
-import { authConfigured, getAccount, signIn, signUp, resendConfirmation } from '../lib/api.js'
+import { authConfigured, getAccount, getCollections, createCollection, signIn, signUp, resendConfirmation, updateProfile } from '../lib/api.js'
 import { authErrorMessage, validateCredentials } from '../lib/auth.js'
 import { useSession } from '../hooks/useSession.js'
 import { usePreferences } from '../hooks/usePreferences.js'
@@ -12,6 +12,7 @@ import SaveFeedback from '../components/SaveFeedback.jsx'
 import AccountProfileCard from '../components/AccountProfileCard.jsx'
 import FeedbackText from '../components/FeedbackText.jsx'
 import PreferencesCard from '../components/PreferencesCard.jsx'
+import CollectionsCard from '../components/CollectionsCard.jsx'
 
 export default function Profile() {
   const { session, loading, error: sessionError, retry, logout, logoutPending, logoutFeedback: logoutResult, dismissLogoutFeedback } = useSession()
@@ -24,6 +25,17 @@ export default function Profile() {
   const [accountResult, setAccountResult] = useState(null)
   const [accountAttempt, setAccountAttempt] = useState(0)
   const userId = session?.user.id
+  const [profileAction, setProfileAction] = useState({ userId: null })
+  const profileBusy = useRef(false)
+  const profileState = profileAction.userId === userId ? profileAction : {}
+  const [collectionsAttempt, setCollectionsAttempt] = useState(0)
+  const [collectionsResult, setCollectionsResult] = useState({ key: null, collections: [], error: null })
+  const [collectionAction, setCollectionAction] = useState({ key: null })
+  const creatingCollection = useRef(false)
+  const collectionsKey = `${userId}:${collectionsAttempt}`
+  const collectionsLoading = collectionsResult.key !== collectionsKey
+  const collections = collectionsLoading ? [] : collectionsResult.collections
+  const collectionState = collectionAction.key === collectionsKey ? collectionAction : {}
   const accountKey = `${userId}:${accountAttempt}`
   const account = accountResult?.key === accountKey ? accountResult.user : null
   const accountError = accountResult?.key === accountKey ? accountResult.error : ''
@@ -33,6 +45,7 @@ export default function Profile() {
   const location = useLocation()
   const navigate = useNavigate()
   const logoutFeedback = logoutResult?.locationKey === location.key ? logoutResult : null
+  const [emailChangeCallback] = useState(() => new URLSearchParams(location.hash.slice(1)).get('type') === 'email_change')
   // Capture callback errors before the SDK removes the URL fragment. Never render
   // arbitrary error descriptions from URLs.
   const [callbackError] = useState(() => {
@@ -49,8 +62,9 @@ export default function Profile() {
   useEffect(() => {
     if (loading || location.pathname !== '/auth/callback') return
     if (!session || callbackError) navigate('/profile', { replace: true })
+    else if (emailChangeCallback) navigate('/profile', { replace: true })
     else if (!prefs.loading) navigate(firstTime ? '/onboarding' : '/profile', { replace: true })
-  }, [loading, session, callbackError, prefs.loading, firstTime, location.pathname, navigate])
+  }, [loading, session, callbackError, emailChangeCallback, prefs.loading, firstTime, location.pathname, navigate])
 
   useEffect(() => {
     let active = true
@@ -64,6 +78,49 @@ export default function Profile() {
     })
     return () => { active = false }
   }, [userId, accountKey])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    getCollections()
+      .then(({ collections }) => !cancelled && setCollectionsResult({ key: collectionsKey, collections, error: null }))
+      .catch((error) => !cancelled && setCollectionsResult({ key: collectionsKey, collections: [], error }))
+    return () => { cancelled = true }
+  }, [userId, collectionsKey])
+
+  async function addCollection(name) {
+    if (creatingCollection.current) return false
+    creatingCollection.current = true
+    setCollectionAction({ key: collectionsKey, pending: true })
+    try {
+      const { collection } = await createCollection(name)
+      setCollectionsResult((previous) => previous.key !== collectionsKey ? previous
+        : { ...previous, collections: [collection, ...previous.collections] })
+      setCollectionAction({ key: collectionsKey })
+      return true
+    } catch (error) {
+      setCollectionAction({ key: collectionsKey, error: error.status === 401
+        ? 'Please log in again to create a collection.' : 'Could not create collection. Please try again.' })
+      return false
+    } finally { creatingCollection.current = false }
+  }
+
+  async function saveProfile(fields) {
+    if (profileBusy.current || !userId) return false
+    profileBusy.current = true
+    setProfileAction({ userId, pending: true })
+    try {
+      const { pendingEmail } = await updateProfile(fields, userId)
+      setProfileAction({ userId, feedback: { message: pendingEmail
+        ? 'Profile saved. Check your current and new email inboxes to confirm the email change.' : 'Profile saved.' } })
+      setAccountAttempt((value) => value + 1)
+      return true
+    } catch (error) {
+      setProfileAction({ userId, feedback: { error: true, message: error.status === 401
+        ? 'Please log in again to edit your profile.' : authErrorMessage(error) } })
+      return false
+    } finally { profileBusy.current = false }
+  }
 
   const update = (key, value) => {
     setFields((previous) => ({ ...previous, [key]: value }))
@@ -134,7 +191,9 @@ export default function Profile() {
             {callbackError && !session && <Text role="alert" color="fg.error">{callbackError}</Text>}
             {!session && <FeedbackText feedback={logoutFeedback} fontSize="sm" />}
             {session ? (
-              <AccountProfileCard name={profileName} email={account?.email || session.user.email}
+              <AccountProfileCard key={userId} name={profileName} displayName={account?.display_name ?? session.user.user_metadata?.display_name ?? ''}
+                email={account?.email || session.user.email} icon={session.user.user_metadata?.avatar_icon}
+                pendingEmail={session.user.new_email} onSave={saveProfile} pending={Boolean(profileState.pending)} feedback={profileState.feedback}
                 loading={!account && !accountError} error={accountError}
                 onRetry={() => setAccountAttempt((n) => n + 1)} />
             ) : (
@@ -185,8 +244,19 @@ export default function Profile() {
               </Card.Root>
             )}
             {session && <>
+              <Card.Root rounded="xl"><Card.Body gap={3}>
+                <Heading size="xl">My reviews</Heading>
+                <Text color="fg.muted">See your ratings and experiences, and edit or delete your reviews.</Text>
+                <Button asChild variant="outline" colorPalette="blue" alignSelf="start">
+                  <RouterLink to="/profile/reviews">View my reviews</RouterLink>
+                </Button>
+              </Card.Body></Card.Root>
               <PreferencesCard preferences={prefs.preferences} loading={prefs.loading}
                 error={prefs.error} onRetry={prefs.retry} />
+              <CollectionsCard key={userId} collections={collections} loading={collectionsLoading}
+                error={!collectionsLoading && Boolean(collectionsResult.error)} pending={Boolean(collectionState.pending)}
+                createError={collectionState.error} onCreate={addCollection}
+                onRetry={() => setCollectionsAttempt((value) => value + 1)} />
               <Stack as="section" aria-labelledby="saved-heading" gap={4}>
                 <Stack gap={1}>
                   <Heading id="saved-heading" as="h2" size="xl">Saved places{saves.loading || saves.loadError ? '' : ` (${saves.places.length})`}</Heading>

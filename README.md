@@ -195,15 +195,99 @@ zero on desktop (SGN-005).
 
 | Route | Screen | Notes |
 |---|---|---|
-| `/` | Home (Discover tab) | landing + card grid. Selected tags live in `?tags=Late%20Night,Spicy` so filtered views are shareable and the back button works |
+| `/` | Home (Discover tab) | paginated card grid with 10, 20, or 30 rows per page (30, 60, or 90 places; default 10 rows). Sort by Recommended, A–Z (`sort=az`), or Z–A (`sort=za`). Rows use the desktop three-column layout; mobile keeps the same places per page. Tags, page, rows, and sort live in the URL; search/filter/size/sort changes return to page 1. Filtering and sorting happen before pagination. |
 | `/ask` | Ask (Ask tab) | chat search: "cheap supper in Bugis for 6" → top 3 places with a reason each. Conversation lives in memory (`AskProvider`), not the URL: it survives opening a place and switching tabs, and is cleared by New search, logging out or a refresh |
-| `/profile` | Account | signup/login, verified identity, My preferences and Saved places; Supabase persists sessions across refreshes |
+| `/profile` | Account | signup/login, verified identity, My preferences, Collections above Saved places, and a link to My reviews; Supabase persists sessions across refreshes |
+| `/profile/reviews` | My reviews | signed-in user's reviews with place links, 1–5 star ratings, Singapore date/time, Edit and Delete |
+| `/profile/collections/:id` | CollectionDetail | owner's named collection; search/add/remove places and share a view-only link |
+| `/collections/shared/:token` | SharedCollection | public view-only collection, available only after the owner shares it |
 | `/onboarding` | Taste survey | four optional chip questions; Skip leaves stored preferences unchanged, Finish saves, Account → Edit restores selections |
 | `/auth/callback` | Email confirmation | valid confirmation opens `/onboarding`; errors return to `/profile` |
 | `/places/:id` | PlaceDetail | one place |
 | `*` | NotFound | |
 
 Tag filtering matches places that have **any** of the selected tags (`overlaps` in `routes/places.js`; change to `contains` for all-of).
+
+### Collections
+
+Account includes a Collections card directly above Saved places, with collection
+tiles arranged side by side and horizontal scrolling on smaller screens. Signed-in users
+can create a collection with a name (1–80 characters), open it, search the catalogue
+to add places, and remove places. A place appears once per collection. Removing
+it from a collection leaves Saved places and the catalogue unchanged.
+
+Discover cards include a bookmark beside the heart. An empty bookmark opens a
+small picker of the signed-in user's collections; selecting one adds the place,
+closes the picker, and fills the bookmark. Clicking the filled bookmark removes
+the place from all of that user's collections without changing heart saves or
+other users' collections. Bookmark state is loaded on each visit and survives
+refreshes. Guests get a login link; an empty list links to Account to create a
+collection. Loads and writes show errors with retry; failed removals keep the
+last known state and recheck memberships before retrying.
+
+The share icon at the top of the collection enables view-only sharing and copies
+an unguessable link. A selectable link is also shown if clipboard access is
+unavailable. Collections are private until shared; anyone with a shared link can
+view the current places without logging in, while only the owner can add/remove
+places or enable sharing. Shared responses contain no owner details.
+
+`routes/collections.js` supplies authenticated `GET /collections`,
+`POST /collections { "name": "Weekend cafes" }`, `GET /collections/:id`,
+`PUT` / `DELETE /collections/:id/places/:placeId`, and
+`POST /collections/:id/share`. `GET /collections/shared/:token` is public and
+checks that sharing has been enabled. Private reads and mutations check the
+verified owner ID; direct browser writes are denied by database permissions.
+`GET /collections?place_id=<uuid>` adds `contains_place` flags for the Discover
+picker, looking up memberships only within the verified owner's collections.
+Authenticated `GET /collections/bookmarks` returns distinct place IDs in the
+user's collections. `DELETE /collections/places/:placeId` removes that place
+across the verified user's own collections only, and is safe to repeat.
+The additive migration is `20261104152905_create_collections.sql`; no new env vars.
+
+```bash
+npx supabase migration up --local
+npm run test:collections:local -w api
+npm run test:e2e:local -w web -- e2e/collections.spec.js
+```
+
+Tests use temporary local accounts and clean up their collections. No database
+reset, Google request, or Gemini request is needed for these tests.
+
+### Community reviews
+
+Place details include public text reviews and 1–5 star ratings, separate from Google's rating and review
+count. Signed-in users can post one review per place (1–2,000 characters, rating required) and use
+**Edit review** on their own review to update it. Guests and other users can read
+the reviews. Names come from the author's display name, with “Community member”
+as the fallback; email addresses are never included. Failed saves preserve the draft.
+Account → **View my reviews** opens `/profile/reviews`, where authors can see the
+place name, rating, original review date/time in Singapore, and any edit time.
+They can edit both text and rating or delete after confirmation. Older text-only
+reviews show “Not rated” until their author adds a score; existing data is preserved.
+
+`GET /places/:id/reviews` returns the place's reviews, newest first.
+`PUT /places/:id/review` accepts `{ "body": "Your experience", "rating": 4 }` and requires a
+verified Bearer token. Ownership always comes from the token; repeated writes
+update that author's existing review. Direct browser database writes are denied.
+Storage is added by `20261104145126_create_place_reviews.sql`, applied to hosted
+environments by the existing migration workflow after merge. No new env vars.
+The additive `20261104151344_add_review_ratings.sql` migration adds the nullable
+rating column for historical reviews and constrains scores to 1–5.
+`GET /me/reviews` returns only the signed-in user's reviews with place names;
+`PUT /me/reviews/:id` updates that user's review and `DELETE /me/reviews/:id`
+removes it. Both mutations filter by the verified user ID and return 404 for
+another author's review. These routes require a valid Bearer token.
+
+For an existing local database, apply pending migrations without resetting data:
+
+```bash
+npx supabase migration up --local
+npm run test:reviews:local -w api
+npm run test:e2e:local -w web -- e2e/reviews.spec.js
+```
+
+The review integration tests use local Supabase and clean up their temporary
+accounts/reviews. They do not call Google or Gemini.
 
 ### Accounts (SGN-013) and Auth settings (ENG-03)
 
@@ -212,6 +296,21 @@ open http://127.0.0.1:54324 to receive test messages. After changing local Auth 
 Supabase without resetting the database. Hosted staging/production need separate Dashboard configuration.
 `GET /me` verifies the Supabase JWT and returns only the current user's identity; guest discovery remains public.
 Run `npm test -w api` for unit tests and `npm run test:auth:local -w api` for the opt-in local email/token workflow.
+
+Account → **Edit profile** updates the display name, email, and a preset profile
+icon (initials, animals, or food icons). Name/icon changes are saved in the user's
+Auth metadata and survive refreshes. Updates use the signed-in user's Auth client;
+no admin key or custom profile table is involved. A failed save retains the draft,
+and Cancel leaves the stored profile unchanged.
+
+Email changes use [Supabase's authenticated update flow](https://supabase.com/docs/reference/javascript/auth-updateuser),
+with confirmation at the current and new addresses when secure email change is
+enabled. The current email stays visible/active while confirmation is pending.
+Email-change callbacks return to Account. In local development, confirmation
+messages are captured in Mailpit at http://127.0.0.1:54324.
+Run `npm run test:e2e:local -w web -- e2e/profile-edit.spec.js e2e/pagination.spec.js`
+for profile edits, local email confirmation, alphabetical sorting, and pagination.
+These tests use and clean up temporary local accounts and emails.
 
 The logged-in Account screen (ENG-06) has a profile card, editable preferences,
 a semantic compact saved list with a count, and Log out below the list. Each data
@@ -293,6 +392,14 @@ It writes the common Places payload format into `raw_places`; the existing trigg
 `places`, so refresh the home page to display names, addresses, ratings and review counts.
 Details show a Google Maps link and weekly opening hours when supplied. Text price ranges
 are not converted into dollar tiers, and an old open/closed snapshot is not shown as live status.
+Complete English weekday descriptions from SerpApi also drive open/closed status,
+including split shifts, overnight times and 24-hour days. Existing text-only imports
+work without a database update or reimport; future imports also save structured periods.
+Missing, incomplete or unrecognised hours remain unknown instead of being guessed.
+Holiday annotations are treated per weekday: a note such as “Diwali might affect
+these hours” on Friday does not hide clear Thursday hours. The affected day stays
+unknown; possible overnight carry-over from an uncertain previous day is also
+treated conservatively. Original notes remain visible on place details.
 Repeated imports update the same place IDs and preserve existing AI tags and summaries.
 On an existing local database, apply pending repository migrations first with
 `npx supabase migration up --local`; no database reset is needed.

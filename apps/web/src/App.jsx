@@ -4,6 +4,9 @@ import Home from './pages/Home.jsx'
 import Ask from './pages/Ask.jsx'
 import Profile from './pages/Profile.jsx'
 import PlaceDetail from './pages/PlaceDetail.jsx'
+import MyReviews from './pages/MyReviews.jsx'
+import CollectionDetail from './pages/CollectionDetail.jsx'
+import SharedCollection from './pages/SharedCollection.jsx'
 import NotFound from './pages/NotFound.jsx'
 import BottomNav, { NAV_HEIGHT } from './components/BottomNav.jsx'
 import SiteHeader from './components/SiteHeader.jsx'
@@ -27,12 +30,12 @@ export default function App() {
 }
 
 // Which tab each page belongs to. Routes match case-insensitively and ignore a trailing slash.
-const TAB_OF = { '/': '/', '/ask': '/ask', '/profile': '/profile', '/onboarding': '/profile', '/auth/callback': '/profile' }
+const TAB_OF = { '/': '/', '/ask': '/ask', '/profile': '/profile', '/profile/reviews': '/profile', '/onboarding': '/profile', '/auth/callback': '/profile' }
 
 function AppLayout() {
   const { pathname } = useLocation()
   const path = pathname.replace(/\/+$/, '').toLowerCase() || '/'
-  const activeTab = TAB_OF[path] ?? null
+  const activeTab = TAB_OF[path] ?? (path.startsWith('/profile/collections/') ? '/profile' : null)
   // Pages stretch to fill <main>, so none of them needs to know the header's height.
   return (
     <Flex direction="column" minH="100dvh" css={{
@@ -45,6 +48,9 @@ function AppLayout() {
           <Route path="/" element={<Home />} />
           <Route path="/ask" element={<Ask />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/reviews" element={<MyReviews />} />
+          <Route path="/profile/collections/:id" element={<CollectionDetail />} />
+          <Route path="/collections/shared/:token" element={<SharedCollection />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/auth/callback" element={<Profile />} />
           <Route path="/places/:id" element={<PlaceDetail />} />

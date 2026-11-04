@@ -1,3 +1,5 @@
+import { scheduleFromDescriptions } from './hours-text.js'
+
 // The browser and API use the same weekly Google opening periods in Singapore time.
 const OPEN = { label: 'Open now', color: 'green' }
 const CLOSED = { label: 'Closed', color: 'red' }
@@ -14,6 +16,19 @@ const validPeriod = (period) => validTime(period?.open) && (period.close
   : toMinutes(period.open) === 0)
 const validPeriods = (hours) => Array.isArray(hours?.periods) && hours.periods.length > 0 &&
   hours.periods.every(validPeriod)
+
+export function normalizeOpeningHours(hours) {
+  if (!hours || hours.periods !== undefined) return hours
+  const schedule = scheduleFromDescriptions(hours.weekdayDescriptions)
+  // Do not persist a partial set of periods: that would make holiday days look closed.
+  return schedule?.periods.length && !schedule.uncertainDays.length ? { ...hours, periods: schedule.periods } : hours
+}
+
+function openingSchedule(hours) {
+  if (validPeriods(hours)) return { periods: hours.periods, uncertainDays: [] }
+  if (hours?.periods !== undefined) return null
+  return scheduleFromDescriptions(hours?.weekdayDescriptions)
+}
 const sgClock = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Singapore', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23',
 })
@@ -35,8 +50,16 @@ export function isOpenAt(periods, minuteOfWeek) {
 }
 
 export function openStatus(hours, now = new Date()) {
-  if (!validPeriods(hours)) return UNKNOWN
-  return isOpenAt(hours.periods, singaporeMinuteOfWeek(now)) ? OPEN : CLOSED
+  const schedule = openingSchedule(hours)
+  if (!schedule) return UNKNOWN
+  const minute = singaporeMinuteOfWeek(now)
+  const day = Math.floor(minute / 1440)
+  if (schedule.uncertainDays.includes(day)) return UNKNOWN
+  if (isOpenAt(schedule.periods, minute)) return OPEN
+  // Yesterday's uncertain hours might run past midnight. A clear current-day
+  // opening is still usable; otherwise avoid inventing a closing boundary.
+  if (schedule.uncertainDays.includes((day + 6) % 7)) return UNKNOWN
+  return CLOSED
 }
 
 export function isOpenNow(hours, now = new Date()) {
@@ -45,9 +68,10 @@ export function isOpenNow(hours, now = new Date()) {
 
 // The next opening instant, for a no-match suggestion. Unknown hours never become a guess.
 export function nextOpening(hours, now = new Date()) {
-  if (!validPeriods(hours) || isOpenNow(hours, now)) return null
+  const schedule = openingSchedule(hours)
+  if (!schedule?.periods.length || schedule.uncertainDays.length || isOpenNow(hours, now)) return null
   const minute = singaporeMinuteOfWeek(now)
-  const wait = Math.min(...hours.periods.map(({ open }) => (toMinutes(open) - minute + WEEK) % WEEK))
+  const wait = Math.min(...schedule.periods.map(({ open }) => (toMinutes(open) - minute + WEEK) % WEEK))
   const startOfMinute = Math.floor(now.getTime() / 60000) * 60000
   return new Date(startOfMinute + wait * 60000)
 }

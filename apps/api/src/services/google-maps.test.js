@@ -21,6 +21,14 @@ test('converts SerpApi fields to the DB trigger format without inventing live op
   assert.equal(normalizeGoogleMapsPlace({ ...result, price: '$10–20' }).priceLevel, null)
 })
 
+test('complete weekly text is imported as structured periods for web and API', () => {
+  const operating_hours = Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => [day, '8\u202fam–11\u202fpm']))
+  const hours = normalizeGoogleMapsPlace({ ...result, operating_hours }).regularOpeningHours
+  assert.equal(hours.weekdayDescriptions.length, 7)
+  assert.equal(hours.periods.length, 7)
+  assert.deepEqual(hours.periods[0], { open: { day: 1, hour: 8, minute: 0 }, close: { day: 1, hour: 23, minute: 0 } })
+})
+
 test('rejects missing identities and results outside Singapore', () => {
   assert.equal(normalizeGoogleMapsPlace({ title: 'Missing ID' }), null)
   assert.equal(normalizeGoogleMapsPlace({ ...result, country: 'Malaysia' }), null)

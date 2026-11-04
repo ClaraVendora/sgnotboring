@@ -1,3 +1,5 @@
+import { normalizeOpeningHours } from '@sgnotboring/shared/hours'
+
 // SerpApi Google Maps results → the Places API (New) shape used by our DB trigger.
 // The API key stays on the server; never log the request URL (it contains the key).
 const PRICE_LEVELS = [
@@ -52,7 +54,7 @@ export function normalizeGoogleMapsPlace(result) {
     rating: typeof result.rating === 'number' ? result.rating : null,
     userRatingCount: Number.isInteger(result.reviews) ? result.reviews : null,
     priceLevel: tier === null ? null : PRICE_LEVELS[tier],
-    regularOpeningHours: weekdayDescriptions.length ? { weekdayDescriptions } : null,
+    regularOpeningHours: weekdayDescriptions.length ? normalizeOpeningHours({ weekdayDescriptions }) : null,
     editorialSummary: result.description ? { text: result.description, languageCode: 'en' } : null,
     googleMapsUri: mapsUrl.href,
     photoUrl: coverPhoto(result),

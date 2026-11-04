@@ -34,6 +34,20 @@ export const signUp = ({ email, password, displayName }) => auth().signUp({
   },
 })
 export const signIn = ({ email, password }) => auth().signInWithPassword({ email: email.trim(), password })
+export async function updateProfile({ name, email, icon }, expectedUserId) {
+  const current = await auth().getUser()
+  if (current.error) throw current.error
+  if (!current.data.user || current.data.user.id !== expectedUserId) throw Object.assign(new Error('Please log in again.'), { status: 401 })
+  const requestedEmail = email.trim().toLowerCase()
+  const emailChanged = requestedEmail !== current.data.user.email?.toLowerCase()
+  const { data, error } = await auth().updateUser({
+    data: { display_name: name.trim(), avatar_icon: icon },
+    ...(emailChanged ? { email: requestedEmail } : {}),
+  }, { emailRedirectTo: confirmationUrl() })
+  if (error) throw error
+  return { user: data.user, pendingEmail: emailChanged && data.user.email?.toLowerCase() !== requestedEmail
+    ? requestedEmail : data.user.new_email ?? '' }
+}
 export const signOut = () => auth().signOut({ scope: 'local' })
 export const resendConfirmation = (email) => auth().resend({
   type: 'signup', email: email.trim(), options: { emailRedirectTo: confirmationUrl() },
@@ -82,6 +96,32 @@ export const setPlaceSaved = (id, saved) => sessionRequest(`/me/saved-places/${e
   { method: saved ? 'PUT' : 'DELETE' }, { required: true })
 export const getTags = () => request('/tags')
 export const getPlace = (id) => sessionRequest(`/places/${encodeURIComponent(id)}`)
+export const getPlaceReviews = (id) => request(`/places/${encodeURIComponent(id)}/reviews`)
+export const savePlaceReview = (id, body, rating) => sessionRequest(`/places/${encodeURIComponent(id)}/review`, {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, rating }),
+}, { required: true })
+export const getMyReviews = () => sessionRequest('/me/reviews', {}, { required: true })
+export const updateMyReview = (id, body, rating) => sessionRequest(`/me/reviews/${encodeURIComponent(id)}`, {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, rating }),
+}, { required: true })
+export const deleteMyReview = (id) => sessionRequest(`/me/reviews/${encodeURIComponent(id)}`, {
+  method: 'DELETE',
+}, { required: true })
+export const getCollections = (placeId) => sessionRequest(`/collections${placeId ? `?place_id=${encodeURIComponent(placeId)}` : ''}`, {}, { required: true })
+export const getCollectionBookmarks = () => sessionRequest('/collections/bookmarks', {}, { required: true })
+export const removePlaceFromCollections = (placeId) => sessionRequest(`/collections/places/${encodeURIComponent(placeId)}`, { method: 'DELETE' }, { required: true })
+export const createCollection = (name) => sessionRequest('/collections', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+}, { required: true })
+export const getCollection = (id) => sessionRequest(`/collections/${encodeURIComponent(id)}`, {}, { required: true })
+export const addCollectionPlace = (id, placeId) => sessionRequest(`/collections/${encodeURIComponent(id)}/places/${encodeURIComponent(placeId)}`, {
+  method: 'PUT',
+}, { required: true })
+export const removeCollectionPlace = (id, placeId) => sessionRequest(`/collections/${encodeURIComponent(id)}/places/${encodeURIComponent(placeId)}`, {
+  method: 'DELETE',
+}, { required: true })
+export const shareCollection = (id) => sessionRequest(`/collections/${encodeURIComponent(id)}/share`, { method: 'POST' }, { required: true })
+export const getSharedCollection = (token) => request(`/collections/shared/${encodeURIComponent(token)}`)
 export function getPlaces(tags = [], q = '') {
   const qs = new URLSearchParams()
   if (tags.length) qs.set('tags', tags.join(','))

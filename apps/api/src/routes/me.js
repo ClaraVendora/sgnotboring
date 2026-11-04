@@ -1,12 +1,15 @@
 import { createRequireUser } from '../hooks/require-user.js'
 import { createPreferencesService, surveyQuestions, surveyTags, validSelection } from '../services/preferences.js'
 import { createSavedPlacesService } from '../services/saved-places.js'
+import { createReviewsService } from '../services/reviews.js'
+import { reviewBodySchema } from '../schemas/review.js'
 
 export default async function meRoutes(app, options = {}) {
   app.decorateRequest('user', null)
   const requireUser = createRequireUser(options.verifyUser)
   const preferences = options.preferences ?? createPreferencesService()
   const savedPlaces = options.savedPlaces ?? createSavedPlacesService()
+  const reviews = options.reviews ?? createReviewsService()
   const placeParams = {
     type: 'object', properties: { id: { type: 'string', format: 'uuid' } },
     required: ['id'], additionalProperties: false,
@@ -15,6 +18,35 @@ export default async function meRoutes(app, options = {}) {
     request.log.error(error, message)
     return reply.code(500).send({ error: message })
   }
+
+  app.get('/me/reviews', { preHandler: requireUser }, async (request, reply) => {
+    try {
+      return { reviews: await reviews.listOwn(request.user.id) }
+    } catch (error) {
+      return failure(request, reply, error, 'Could not load your reviews')
+    }
+  })
+  app.put('/me/reviews/:id', {
+    preHandler: requireUser, schema: { params: placeParams, body: reviewBodySchema },
+  }, async (request, reply) => {
+    try {
+      const review = await reviews.edit(request.user.id, request.params.id, request.body.body.trim(), request.body.rating)
+      if (!review) return reply.code(404).send({ error: 'Review not found' })
+      return { review }
+    } catch (error) {
+      return failure(request, reply, error, 'Could not update review')
+    }
+  })
+  app.delete('/me/reviews/:id', {
+    preHandler: requireUser, schema: { params: placeParams },
+  }, async (request, reply) => {
+    try {
+      if (!await reviews.remove(request.user.id, request.params.id)) return reply.code(404).send({ error: 'Review not found' })
+      return { deleted: true }
+    } catch (error) {
+      return failure(request, reply, error, 'Could not delete review')
+    }
+  })
 
   app.get('/me/preferences/options', { preHandler: requireUser }, async () => ({ questions: surveyQuestions }))
   app.get('/me/preferences', { preHandler: requireUser }, async (request, reply) => {

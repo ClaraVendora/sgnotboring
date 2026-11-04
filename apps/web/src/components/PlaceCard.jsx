@@ -4,10 +4,12 @@ import { useOpenStatus } from '../hooks/useOpenStatus.js'
 import { placeMeta } from '../lib/place-card.js'
 import PlacePhoto from './PlacePhoto.jsx'
 import SaveButton from './SaveButton.jsx'
+import CollectionPicker from './CollectionPicker.jsx'
 
 // `reason`: optional one-liner from /ask on why this place was picked.
 // `save`: SaveButton props from useSavedPlaces. `compact`: thumbnail row for lists and chat.
-export default function PlaceCard({ place, reason, save, compact = false }) {
+// `collection`: optional picker state/callbacks owned by the Discover page.
+export default function PlaceCard({ place, reason, save, collection, action, compact = false }) {
   const status = useOpenStatus(place?.opening_hours)
   if (!place) return null
   const label = status.label === 'Open now' ? 'OPEN' : status.label === 'Closed' ? 'CLOSED' : status.label
@@ -23,7 +25,11 @@ export default function PlaceCard({ place, reason, save, compact = false }) {
               </Card.Title>
               <Badge colorPalette={status.color} variant="subtle" size="sm">{label}</Badge>
             </HStack>
-            {save && <SaveButton name={place.name} {...save} />}
+            {(collection || save || action) && <HStack gap={1} flexShrink={0} align="start">
+              {collection && <CollectionPicker name={place.name} {...collection} />}
+              {save && <SaveButton name={place.name} {...save} />}
+              {action}
+            </HStack>}
           </HStack>
           <Text fontSize="xs" color="fg.muted" lineHeight={1.7}>{placeMeta(place)}</Text>
           <Wrap gap={1}>

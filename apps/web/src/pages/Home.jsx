@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Box, Button, Container, Heading, HStack, NativeSelect, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
-import { addCollectionPlace, getCollectionBookmarks, getCollections, getPlaces, getTags, removePlaceFromCollections } from '../lib/api.js'
+import { addCollectionPlace, getCollectionBookmarks, getCollections, getPlacesPage, getTags, removePlaceFromCollections } from '../lib/api.js'
 import PlaceSearch from '../components/PlaceSearch.jsx'
 import TagFilter from '../components/TagFilter.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
@@ -9,8 +9,8 @@ import QuickFilters from '../components/QuickFilters.jsx'
 import SaveFeedback from '../components/SaveFeedback.jsx'
 import { useCurrentMinute } from '../hooks/useOpenStatus.js'
 import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
-import { filterOpenPlaces, sortPlaces } from '../lib/place-filters.js'
 import { useSession } from '../hooks/useSession.js'
+import { filterOpenPlaces, sortPlaces } from '../lib/place-filters.js'
 
 // Selected tags live in the URL (?tags=Late%20Night,Spicy) so filtered views are
 // shareable and the back button works. Search (?q=) replaces the current entry instead,
@@ -102,16 +102,9 @@ export default function Home() {
   const q = searchParams.get('q') ?? ''
   const openNow = searchParams.get('open_now') === '1'
   const sort = ['az', 'za'].includes(searchParams.get('sort')) ? searchParams.get('sort') : 'recommended'
-  const rowsPerPage = [10, 20, 30].includes(Number(searchParams.get('rows_per_page')))
-    ? Number(searchParams.get('rows_per_page')) : 10
-  // Use the desktop three-column grid to define a row, keeping page contents
-  // stable when the responsive layout switches to one or two columns.
-  const pageSize = rowsPerPage * 3
-  const requestedPage = Number(searchParams.get('page') ?? 1)
-  const resultsHeading = useRef(null)
   const minute = useCurrentMinute()
   const [moreFilters, setMoreFilters] = useState(false)
-  const resultKey = JSON.stringify([tagsKey, q])
+  const resultKey = JSON.stringify([tagsKey, q, openNow, sort])
   const updateParam = useCallback((name, value, options) => {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous)
@@ -128,18 +121,36 @@ export default function Home() {
   const [result, setResult] = useState({ key: null, places: null, error: null })
   const loading = result.key !== resultKey
   const { places: fetchedPlaces, error } = loading ? { places: null, error: null } : result
-  const places = fetchedPlaces && sortPlaces(filterOpenPlaces(fetchedPlaces, openNow, new Date(minute)), sort)
-  const totalPages = Math.max(1, Math.ceil((places?.length ?? 0) / pageSize))
-  const page = Math.min(totalPages, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1)
-  const first = (page - 1) * pageSize
-  const visiblePlaces = places?.slice(first, first + pageSize)
-  const pageNumbers = [...new Set([1, ...Array.from({ length: 5 }, (_, index) => page - 2 + index), totalPages])]
-    .filter((number) => number >= 1 && number <= totalPages).sort((a, b) => a - b)
-  const changePage = (number) => {
-    updateParam('page', number === 1 ? '' : String(number))
-    resultsHeading.current?.focus({ preventScroll: true })
-    resultsHeading.current?.scrollIntoView({ block: 'start' })
-  }
+  const places = useMemo(() => fetchedPlaces && (openNow
+    ? sortPlaces(filterOpenPlaces(fetchedPlaces, true, new Date(minute)), sort) : fetchedPlaces),
+  [fetchedPlaces, openNow, minute, sort])
+  const total = openNow ? places?.length : result.total
+  const visiblePlaces = places
+  const [pageResult, setPageState] = useState({ key: null, busy: false, error: false })
+  const pageState = pageResult.key === resultKey ? pageResult : { busy: false, error: false }
+  const sentinel = useRef(null)
+  const busy = useRef(false)
+  const currentKey = useRef(resultKey)
+  useEffect(() => { currentKey.current = resultKey }, [resultKey])
+  const hasMore = Boolean(!openNow && places && places.length < result.total)
+  const loadMore = useCallback(async () => {
+    if (busy.current || !hasMore) return
+    busy.current = true
+    setPageState({ key: resultKey, busy: true, error: false })
+    const key = resultKey
+    try {
+      const next = await getPlacesPage({ tags: tagsKey, q, openNow, sort, offset: places.length })
+      if (currentKey.current === key) setResult((previous) => previous.key !== key ? previous : ({ ...previous, total: next.total,
+        places: [...previous.places, ...next.places.filter((row) => !previous.places.some((old) => old.id === row.id))] }))
+    } catch { if (currentKey.current === key) setPageState({ key, busy: false, error: true }) }
+    finally { busy.current = false; setPageState((previous) => ({ ...previous, busy: false })) }
+  }, [hasMore, resultKey, tagsKey, q, openNow, sort, places])
+  useEffect(() => {
+    if (!sentinel.current || !hasMore || pageState.error || !('IntersectionObserver' in window)) return
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadMore() }, { rootMargin: '200px' })
+    observer.observe(sentinel.current)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, pageState.error])
 
   useEffect(() => {
     let cancelled = false
@@ -151,13 +162,26 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false
-    getPlaces(tagsKey.split(',').filter(Boolean), q)
-      .then((data) => !cancelled && setResult({ key: resultKey, places: data, error: null }))
+    // The browser owns current-time filtering (SGN-003). Collect all matching
+    // candidates so the count includes open places beyond the first batch.
+    async function load() {
+      const first = await getPlacesPage({ tags: tagsKey, q, openNow: false, sort, offset: 0 })
+      if (!openNow) return first
+      const rows = [...first.places]
+      while (!cancelled && rows.length < first.total) {
+        const next = await getPlacesPage({ tags: tagsKey, q, openNow: false, sort, offset: rows.length })
+        if (!next.places.length) break
+        rows.push(...next.places)
+      }
+      return { places: rows, total: rows.length }
+    }
+    load()
+      .then((data) => !cancelled && setResult({ key: resultKey, places: data.places, total: data.total, error: null }))
       .catch((e) => !cancelled && setResult({ key: resultKey, places: null, error: e.message }))
     return () => {
       cancelled = true
     }
-  }, [tagsKey, q, resultKey])
+  }, [tagsKey, q, openNow, sort, resultKey])
 
   const toggle = (tag) => {
     const next = selected.includes(tag) ? selected.filter((t) => t !== tag) : [...selected, tag]
@@ -216,23 +240,14 @@ export default function Home() {
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
             </HStack>
-            <HStack gap={2}>
-              <Text as="label" htmlFor="places-page-size" fontSize="sm" color="fg.muted">Rows per page</Text>
-              <NativeSelect.Root size="sm" width="80px">
-                <NativeSelect.Field id="places-page-size" value={rowsPerPage}
-                  onChange={(event) => updateParam('rows_per_page', event.target.value)}>
-                  {[10, 20, 30].map((size) => <option key={size} value={size}>{size}</option>)}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </HStack>
+
           </HStack>
            <HStack justify="space-between" align="end" gap={3} flexWrap="wrap" mt={-1}>
-            <Heading ref={resultsHeading} tabIndex={-0} scrollMarginTop="3" size="xl" letterSpacing="-0.3px">Places to visit</Heading>
+            <Heading tabIndex={-1} scrollMarginTop="3" size="xl" letterSpacing="-0.3px">Places to visit</Heading>
             <Text role="status" aria-live="polite" fontSize="xs" color="fg.muted" textAlign="right">
               {loading
                 ? 'Loading food places…'
-                : places?.length ? `Showing ${first + 1}–${Math.min(first + pageSize, places.length)} of ${places.length} food places` : places ? '0 food places' : 'Could not load food places'}
+                : places?.length ? `Showing ${places.length} of ${total} food places` : places ? '0 food places' : 'Could not load food places'}
             </Text>
           </HStack>
           {error && <Text color="fg.error">Couldn't load places: {error}</Text>}
@@ -268,20 +283,11 @@ export default function Home() {
             </SimpleGrid>
           )}
           {places?.length > 0 && (
-            <Stack as="nav" aria-label="Places pagination" align="center" gap={3}>
-              <Text fontSize="sm" color="fg.muted">Page {page} of {totalPages}</Text>
-              <HStack gap={1} flexWrap="wrap" justify="center">
-                <Button size="sm" variant="outline" disabled={page === 1} onClick={() => changePage(page - 1)}>Previous</Button>
-                {pageNumbers.map((number, index) => (
-                  <HStack key={number} gap={1}>
-                    {index > 0 && number - pageNumbers[index - 1] > 1 && <Text px={1} aria-hidden="true">…</Text>}
-                    <Button size="sm" variant={number === page ? 'solid' : 'ghost'} colorPalette="blue"
-                      aria-label={`Go to page ${number}`} aria-current={number === page ? 'page' : undefined}
-                      onClick={() => changePage(number)}>{number}</Button>
-                  </HStack>
-                ))}
-                <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => changePage(page + 1)}>Next</Button>
-              </HStack>
+            <Stack ref={sentinel} align="center" minH="60px" aria-live="polite">
+              {pageState.busy && <Spinner size="sm" />}
+              {pageState.error && <Text color="fg.error">Could not load more places. Please retry.</Text>}
+              {hasMore ? <Button disabled={pageState.busy} onClick={loadMore} variant="outline">{pageState.error ? 'Retry' : 'Load more places'}</Button>
+                : <Text color="fg.muted">You've seen everything</Text>}
             </Stack>
           )}
         </Stack>

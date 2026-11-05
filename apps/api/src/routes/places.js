@@ -1,5 +1,5 @@
 import { supabase } from '../services/supabase.js'
-import { searchPlaces } from '../services/places.js'
+import { searchPlaces, searchPlacesPage } from '../services/places.js'
 import { createOptionalUser, createRequireUser } from '../hooks/require-user.js'
 import { createReviewsService } from '../services/reviews.js'
 import { reviewBodySchema } from '../schemas/review.js'
@@ -55,6 +55,10 @@ export default async function placesRoutes(app, options = {}) {
           properties: {
             tags: { type: 'string', maxLength: 500 },
             q: { type: 'string', maxLength: 100 },
+            limit: { type: 'integer', minimum: 1, maximum: 100 },
+            offset: { type: 'integer', minimum: 0, maximum: 100000 },
+            open_now: { type: 'boolean' },
+            sort: { type: 'string', enum: ['recommended', 'az', 'za'] },
           },
           additionalProperties: false,
         },
@@ -63,6 +67,10 @@ export default async function placesRoutes(app, options = {}) {
     async (req, reply) => {
       let places
       try {
+        if (req.query.limit !== undefined) {
+          const page = await (options.searchPlacesPage ?? searchPlacesPage)(req.query)
+          return { ...page, places: await withSavedFlags(savedPlaces, page.places, req.user?.id, req.log) }
+        }
         places = await search(req.query)
       } catch (error) {
         req.log.error(error, 'Could not search places')

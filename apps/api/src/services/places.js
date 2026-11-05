@@ -1,3 +1,4 @@
+import { isOpenNow } from '@sgnotboring/shared/hours'
 import { supabase } from './supabase.js'
 
 const CARD_FIELDS =
@@ -11,4 +12,13 @@ export async function searchPlaces({ q = '', tags = '' }) {
     .select(CARD_FIELDS)
   if (error) throw new Error(error.message)
   return data
+}
+
+// Preserve the original array response for existing collection callers.
+export async function searchPlacesPage({ limit = 24, offset = 0, open_now = false, sort = 'recommended', ...filters }) {
+  const rows = await searchPlaces(filters)
+  const now = new Date()
+  const filtered = open_now ? rows.filter((row) => isOpenNow(row.opening_hours, now)) : rows
+  if (sort !== 'recommended') filtered.sort((a, b) => (sort === 'za' ? -1 : 1) * a.name.localeCompare(b.name, 'en-SG') || a.id.localeCompare(b.id))
+  return { places: filtered.slice(offset, offset + limit), total: filtered.length }
 }

@@ -134,3 +134,7 @@ export const askPlaces = (message, history = [], { personalised = false, signal 
   method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
   body: JSON.stringify({ message, history, ...(personalised && { personalised }) }),
 })
+
+export function getPlacesPage({ tags, q, openNow, sort, offset }) {
+  return sessionRequest(`/places?${new URLSearchParams({ tags, q, open_now: String(openNow), sort, offset: String(offset), limit: '24' })}`)
+}

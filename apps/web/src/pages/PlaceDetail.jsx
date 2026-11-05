@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Badge, Container, Heading, HStack, Link, Spinner, Stack, Text, Wrap } from '@chakra-ui/react'
+import { Badge, Box, Button, Container, Heading, HStack, Link, Spinner, Stack, Text, Wrap } from '@chakra-ui/react'
 import { getPlace, getPlaceReviews, savePlaceReview } from '../lib/api.js'
 import { useOpenStatus } from '../hooks/useOpenStatus.js'
+import WeeklyHours from '../components/WeeklyHours.jsx'
+import { placeArea, priceBand } from '../lib/place-card.js'
 import PlacePhoto from '../components/PlacePhoto.jsx'
-import SaveButton from '../components/SaveButton.jsx'
 import SaveFeedback from '../components/SaveFeedback.jsx'
 import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
 import { useSession } from '../hooks/useSession.js'
@@ -104,43 +105,33 @@ export default function PlaceDetail() {
         <Link asChild alignSelf="flex-start">
           <RouterLink to="/" onClick={back}>← Back</RouterLink>
         </Link>
-        <HStack justify="space-between" align="start">
+        <PlacePhoto src={place.photo_url} name={place.name} loading="eager" />
+        <HStack justify="space-between" align="start" flexWrap="wrap">
           <Heading size="3xl">{place.name}</Heading>
-          <SaveButton name={place.name} {...saves.buttonProps(place)} />
+          <Badge colorPalette={status.color} variant="subtle">{status.label}</Badge>
+        </HStack>
+        <Text color="fg.muted">
+          {place.rating == null ? 'No rating' : `★ ${place.rating} (${place.user_ratings_total ?? 0} reviews)`}
+          {' · '}{priceBand(place.price_level)}{' · '}{placeArea(place)}
+        </Text>
+        <Wrap gap={1}>{place.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}</Wrap>
+        {place.summary && <Text fontSize="lg">{place.summary}</Text>}
+        <Box borderWidth="1px" rounded="xl" p={{ base: 4, md: 6 }}>
+          <Stack gap={5}>
+            <Stack gap={1}><Heading size="md">Address</Heading><Text>{place.address || 'Address unavailable'}</Text></Stack>
+            <WeeklyHours hours={place.opening_hours} />
+          </Stack>
+        </Box>
+        <HStack flexWrap="wrap" gap={3}>
+          {/^https?:\/\//i.test(place.google_maps_uri ?? '') && <Button asChild colorPalette="blue">
+            <a href={place.google_maps_uri} target="_blank" rel="noopener noreferrer">Open in Maps ↗</a>
+          </Button>}
+          <Button variant="outline" disabled={saves.buttonProps(place).disabled || saves.buttonProps(place).pending}
+            aria-pressed={Boolean(saves.buttonProps(place).saved)} onClick={saves.buttonProps(place).onToggle}>
+            {saves.buttonProps(place).saved ? '♥ Saved place' : '♡ Save place'}
+          </Button>
         </HStack>
         <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />
-        <PlacePhoto src={place.photo_url} name={place.name} loading="eager" />
-        <HStack gap={3} color="fg.muted">
-          {place.rating != null && (
-            <Text>
-              ★ {place.rating} ({place.user_ratings_total ?? 0})
-            </Text>
-          )}
-          {place.price_level != null && <Text>{place.price_level === 0 ? 'Free' : '$'.repeat(place.price_level)}</Text>}
-          <Badge colorPalette={status.color} variant="subtle">
-            {status.label}
-          </Badge>
-        </HStack>
-        {place.address && <Text>{place.address}</Text>}
-        {place.opening_hours?.weekdayDescriptions?.length > 0 && (
-          <Stack gap={1}>
-            <Heading size="md">Opening hours</Heading>
-            {place.opening_hours.weekdayDescriptions.map((day) => <Text key={day} fontSize="sm">{day}</Text>)}
-          </Stack>
-        )}
-        {place.google_maps_uri && (
-          <Link href={place.google_maps_uri} target="_blank" rel="noreferrer" colorPalette="blue" alignSelf="flex-start">
-            Open in Google Maps ↗
-          </Link>
-        )}
-        {place.summary && <Text fontSize="lg">{place.summary}</Text>}
-        <Wrap gap={1}>
-          {place.tags.map((t) => (
-            <Badge key={t} variant="outline">
-              {t}
-            </Badge>
-          ))}
-        </Wrap>
         <PlaceReviews key={`${actionKey}:${reviewsLoading ? 'loading' : 'ready'}`}
           reviews={reviews} userId={userId} loading={reviewsLoading || sessionLoading}
           error={reviewsResult.id === id && reviewsResult.error} pending={Boolean(action.pending)}

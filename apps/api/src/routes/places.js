@@ -1,5 +1,5 @@
 import { supabase } from '../services/supabase.js'
-import { searchPlaces } from '../services/places.js'
+import { pagePlaces, searchPlaces } from '../services/places.js'
 import { createOptionalUser, createRequireUser } from '../hooks/require-user.js'
 import { createReviewsService } from '../services/reviews.js'
 import { reviewBodySchema } from '../schemas/review.js'
@@ -55,6 +55,9 @@ export default async function placesRoutes(app, options = {}) {
           properties: {
             tags: { type: 'string', maxLength: 500 },
             q: { type: 'string', maxLength: 100 },
+            limit: { type: 'integer', minimum: 1, maximum: 100 },
+            offset: { type: 'integer', minimum: 0, maximum: 100000 },
+            sort: { type: 'string', enum: ['recommended', 'az', 'za'] },
           },
           additionalProperties: false,
         },
@@ -67,6 +70,12 @@ export default async function placesRoutes(app, options = {}) {
       } catch (error) {
         req.log.error(error, 'Could not search places')
         return reply.code(500).send({ error: 'Could not load places' })
+      }
+      // ?limit= opts into one page as { places, total }. Without it the full array is
+      // returned, which Collections and Home's Open now filter rely on.
+      if (req.query.limit !== undefined) {
+        const page = pagePlaces(places, req.query)
+        return { ...page, places: await withSavedFlags(savedPlaces, page.places, req.user?.id, req.log) }
       }
       return withSavedFlags(savedPlaces, places, req.user?.id, req.log)
     },

@@ -11,11 +11,15 @@ test('Discover uses clear hours today even when another day has a holiday note',
   const uncertainToday = week()
   uncertainToday[3] += ' (Diwali hours)'
   await page.route(`${API}/tags`, (route) => route.fulfill({ json: [] }))
-  await page.route(`${API}/places?*`, (route) => route.fulfill({ json: [
+  const places = [
     { id: 'clear', name: 'Clear Thursday hours', tags: [], opening_hours: { weekdayDescriptions: clearToday } },
     { id: 'holiday', name: 'Holiday hours uncertain', tags: [], opening_hours: { weekdayDescriptions: uncertainToday } },
     { id: 'missing', name: 'No hours supplied', tags: [], opening_hours: null },
-  ] }))
+  ]
+  // Home browses in pages ({ places, total } when ?limit= is set); Open now takes the full array.
+  await page.route(`${API}/places?*`, (route) => route.fulfill({
+    json: new URL(route.request().url()).searchParams.has('limit') ? { places, total: places.length } : places,
+  }))
   await page.goto('/')
   await expect(page.getByText('OPEN', { exact: true })).toHaveCount(1)
   await expect(page.getByText('Hours unknown', { exact: true })).toHaveCount(2)

@@ -460,6 +460,12 @@ substring of the name, address, or an assigned tag whose vocabulary facet is `ar
 Selected tags match ANY tag, ANDed with the search text. Punctuation, `%`, and `_`
 are literal characters, not SQL wildcards or filter expressions.
 
+Adding `limit` (1–100) returns one page as `{ places, total }` instead of the full
+array: `GET /places?limit=24&offset=24&sort=az`. `offset` defaults to 0 and `sort` is
+`recommended` (the rating order above), `az` or `za`; `total` counts every match. Home
+loads batches of 24 this way. Its Open now filter calls without `limit` and filters by
+opening hours in the browser, since "open" depends on the viewer's current time.
+
 The home page debounces typing by 300 ms and keeps both `q` and `tags` in the URL.
 Clearing search preserves tags; clearing tags preserves search. Tag changes add a
 history entry, so back/forward restores both; search updates replace the current entry

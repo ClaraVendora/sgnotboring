@@ -128,6 +128,14 @@ export function getPlaces(tags = [], q = '') {
   if (q.trim()) qs.set('q', q.trim())
   return sessionRequest(`/places?${qs}`)
 }
+// One batch of 24 for Home's browse list: { places, total }. tags is comma-separated.
+export function getPlacesPage({ tags = '', q = '', sort = 'recommended', offset = 0 }) {
+  const qs = new URLSearchParams({ limit: '24', offset: String(offset) })
+  if (tags) qs.set('tags', tags)
+  if (q.trim()) qs.set('q', q.trim())
+  if (sort !== 'recommended') qs.set('sort', sort)
+  return sessionRequest(`/places?${qs}`)
+}
 // history: earlier turns [{ role: 'user' | 'assistant', text }] so follow-ups make sense.
 // personalised: lean on the user's survey answers and saved places. signal: aborts the request.
 export const askPlaces = (message, history = [], { personalised = false, signal } = {}) => sessionRequest('/ask', {

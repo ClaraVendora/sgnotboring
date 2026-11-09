@@ -4,7 +4,7 @@ import { Badge, Box, Button, Container, Heading, HStack, Link, Spinner, Stack, T
 import { getPlace, getPlaceReviews, savePlaceReview } from '../lib/api.js'
 import { useOpenStatus } from '../hooks/useOpenStatus.js'
 import WeeklyHours from '../components/WeeklyHours.jsx'
-import { placeArea, priceBand } from '../lib/place-card.js'
+import { placeMeta } from '../lib/place-card.js'
 import PlacePhoto from '../components/PlacePhoto.jsx'
 import SaveFeedback from '../components/SaveFeedback.jsx'
 import { useSavedPlaces } from '../hooks/useSavedPlaces.js'
@@ -98,6 +98,7 @@ export default function PlaceDetail() {
       </Container>
     )
   }
+  const save = saves.buttonProps(place)
 
   return (
     <Container maxW="3xl" py={10}>
@@ -110,10 +111,7 @@ export default function PlaceDetail() {
           <Heading size="3xl">{place.name}</Heading>
           <Badge colorPalette={status.color} variant="subtle">{status.label}</Badge>
         </HStack>
-        <Text color="fg.muted">
-          {place.rating == null ? 'No rating' : `★ ${place.rating} (${place.user_ratings_total ?? 0} reviews)`}
-          {' · '}{priceBand(place.price_level)}{' · '}{placeArea(place)}
-        </Text>
+        <Text color="fg.muted">{placeMeta(place)}</Text>
         <Wrap gap={1}>{place.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}</Wrap>
         {place.summary && <Text fontSize="lg">{place.summary}</Text>}
         <Box borderWidth="1px" rounded="xl" p={{ base: 4, md: 6 }}>
@@ -126,9 +124,9 @@ export default function PlaceDetail() {
           {/^https?:\/\//i.test(place.google_maps_uri ?? '') && <Button asChild colorPalette="blue">
             <a href={place.google_maps_uri} target="_blank" rel="noopener noreferrer">Open in Maps ↗</a>
           </Button>}
-          <Button variant="outline" disabled={saves.buttonProps(place).disabled || saves.buttonProps(place).pending}
-            aria-pressed={Boolean(saves.buttonProps(place).saved)} onClick={saves.buttonProps(place).onToggle}>
-            {saves.buttonProps(place).saved ? '♥ Saved place' : '♡ Save place'}
+          <Button variant="outline" disabled={save.disabled || save.pending} onClick={save.onToggle}
+            aria-pressed={Boolean(save.saved)} aria-busy={Boolean(save.pending)}>
+            {save.saved ? '♥ Saved place' : '♡ Save place'}
           </Button>
         </HStack>
         <SaveFeedback feedback={saves.feedback} loadError={saves.loadError} onDismiss={saves.dismiss} onRetry={saves.retry} />

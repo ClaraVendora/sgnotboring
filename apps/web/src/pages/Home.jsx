@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Box, Button, Container, Heading, HStack, NativeSelect, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
-import { addCollectionPlace, getCollectionBookmarks, getCollections, getPlacesPage, getTags, removePlaceFromCollections } from '../lib/api.js'
+import { addCollectionPlace, getCollectionBookmarks, getCollections, getPlaces, getPlacesPage, getTags, removePlaceFromCollections } from '../lib/api.js'
 import PlaceSearch from '../components/PlaceSearch.jsx'
 import TagFilter from '../components/TagFilter.jsx'
 import PlaceCard from '../components/PlaceCard.jsx'
@@ -108,7 +108,6 @@ export default function Home() {
   const updateParam = useCallback((name, value, options) => {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous)
-      if (name !== 'page') next.delete('page')
       if (value) next.set(name, value)
       else next.delete(name)
       return next
@@ -125,7 +124,6 @@ export default function Home() {
     ? sortPlaces(filterOpenPlaces(fetchedPlaces, true, new Date(minute)), sort) : fetchedPlaces),
   [fetchedPlaces, openNow, minute, sort])
   const total = openNow ? places?.length : result.total
-  const visiblePlaces = places
   const [pageResult, setPageState] = useState({ key: null, busy: false, error: false })
   const pageState = pageResult.key === resultKey ? pageResult : { busy: false, error: false }
   const sentinel = useRef(null)
@@ -139,12 +137,12 @@ export default function Home() {
     setPageState({ key: resultKey, busy: true, error: false })
     const key = resultKey
     try {
-      const next = await getPlacesPage({ tags: tagsKey, q, openNow, sort, offset: places.length })
+      const next = await getPlacesPage({ tags: tagsKey, q, sort, offset: places.length })
       if (currentKey.current === key) setResult((previous) => previous.key !== key ? previous : ({ ...previous, total: next.total,
         places: [...previous.places, ...next.places.filter((row) => !previous.places.some((old) => old.id === row.id))] }))
     } catch { if (currentKey.current === key) setPageState({ key, busy: false, error: true }) }
     finally { busy.current = false; setPageState((previous) => ({ ...previous, busy: false })) }
-  }, [hasMore, resultKey, tagsKey, q, openNow, sort, places])
+  }, [hasMore, resultKey, tagsKey, q, sort, places])
   useEffect(() => {
     if (!sentinel.current || !hasMore || pageState.error || !('IntersectionObserver' in window)) return
     const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadMore() }, { rootMargin: '200px' })
@@ -162,20 +160,12 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false
-    // The browser owns current-time filtering (SGN-003). Collect all matching
-    // candidates so the count includes open places beyond the first batch.
-    async function load() {
-      const first = await getPlacesPage({ tags: tagsKey, q, openNow: false, sort, offset: 0 })
-      if (!openNow) return first
-      const rows = [...first.places]
-      while (!cancelled && rows.length < first.total) {
-        const next = await getPlacesPage({ tags: tagsKey, q, openNow: false, sort, offset: rows.length })
-        if (!next.places.length) break
-        rows.push(...next.places)
-      }
-      return { places: rows, total: rows.length }
-    }
-    load()
+    // The browser owns current-time filtering (SGN-003), so Open now fetches every
+    // matching place in one request and filters here; ordinary browsing pages by 24.
+    const load = openNow
+      ? getPlaces(tagsKey.split(',').filter(Boolean), q).then((rows) => ({ places: rows, total: rows.length }))
+      : getPlacesPage({ tags: tagsKey, q, sort, offset: 0 })
+    load
       .then((data) => !cancelled && setResult({ key: resultKey, places: data.places, total: data.total, error: null }))
       .catch((e) => !cancelled && setResult({ key: resultKey, places: null, error: e.message }))
     return () => {
@@ -214,7 +204,6 @@ export default function Home() {
                   const next = new URLSearchParams(previous)
                   next.delete('tags')
                   next.delete('open_now')
-                  next.delete('page')
                   return next
                 })
               }}>Clear filters</Button>}
@@ -263,7 +252,7 @@ export default function Home() {
           )}
           {places?.length > 0 && (
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {visiblePlaces.map((p) => (
+              {places.map((p) => (
                 <PlaceCard key={p.id} place={p} save={saves.buttonProps(p)} collection={{
                   open: pickerPlaceId === p.id, authLoading, signedIn: Boolean(session),
                   bookmarked: bookmarkedIds.has(p.id),

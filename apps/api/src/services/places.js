@@ -1,4 +1,3 @@
-import { isOpenNow } from '@sgnotboring/shared/hours'
 import { supabase } from './supabase.js'
 
 const CARD_FIELDS =
@@ -14,11 +13,11 @@ export async function searchPlaces({ q = '', tags = '' }) {
   return data
 }
 
-// Preserve the original array response for existing collection callers.
-export async function searchPlacesPage({ limit = 24, offset = 0, open_now = false, sort = 'recommended', ...filters }) {
-  const rows = await searchPlaces(filters)
-  const now = new Date()
-  const filtered = open_now ? rows.filter((row) => isOpenNow(row.opening_hours, now)) : rows
-  if (sort !== 'recommended') filtered.sort((a, b) => (sort === 'za' ? -1 : 1) * a.name.localeCompare(b.name, 'en-SG') || a.id.localeCompare(b.id))
-  return { places: filtered.slice(offset, offset + limit), total: filtered.length }
+// One page of already-matched rows; 'recommended' keeps browse_places() order.
+// Paging happens in memory, which is fine at the current catalogue size. Move it
+// into browse_places() if the catalogue grows to thousands of places.
+export function pagePlaces(rows, { limit = 24, offset = 0, sort = 'recommended' } = {}) {
+  const sorted = sort === 'recommended' ? rows : [...rows].sort((a, b) =>
+    (sort === 'za' ? -1 : 1) * a.name.localeCompare(b.name, 'en-SG') || a.id.localeCompare(b.id))
+  return { places: sorted.slice(offset, offset + limit), total: rows.length }
 }

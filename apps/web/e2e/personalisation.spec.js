@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 
-const env = Object.fromEntries(readFileSync(new URL('../../api/.env', import.meta.url), 'utf8')
+const env = Object.fromEntries(readFileSync(new URL('../../places/.env', import.meta.url), 'utf8')
   .split('\n').filter((line) => /^[A-Z_]+=/.test(line)).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))
 if (!['http://127.0.0.1:54321', 'http://localhost:54321'].includes(env.SUPABASE_URL)) throw new Error('E2E requires local Supabase')
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -86,7 +86,7 @@ test('email signup opens four-question survey; Skip, Finish and prefilled Edit p
   await page.getByRole('button', { name: 'Cafes', exact: true }).click()
   await page.getByRole('button', { name: 'Skip', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'My preferences' })).toBeVisible()
-  expect((await admin.from('preferences').select('*').eq('user_id', account.id)).data).toEqual([])
+  expect((await admin.schema('accounts').from('preferences').select('*').eq('user_id', account.id)).data).toEqual([])
   await page.getByRole('link', { name: 'Take survey', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Cafes', exact: true })).toHaveAttribute('aria-pressed', 'false')
   for (const name of ['Cafes', 'Budget · up to S$15', 'No pork', 'Family']) {
@@ -118,7 +118,7 @@ test('email signup opens four-question survey; Skip, Finish and prefilled Edit p
   await page.getByRole('button', { name: 'Finish', exact: true }).click()
   await expect(page.getByText('Splurge', { exact: true })).toBeVisible()
   await page.screenshot({ path: info.outputPath('account-mobile.png'), fullPage: true, animations: 'disabled' })
-  expect((await admin.from('preferences').select('tags').eq('user_id', account.id).single()).data.tags)
+  expect((await admin.schema('accounts').from('preferences').select('tags').eq('user_id', account.id).single()).data.tags)
     .toEqual(['Cafe', 'No pork', 'Family Friendly', 'Splurge'])
   await noOverflow(page)
   await page.setViewportSize({ width: 1280, height: 900 })
@@ -175,7 +175,7 @@ test('optimistic hearts, rapid taps, failed save/remove rollback and reload', as
   await page.reload()
   await expect(detailHeart).toHaveAttribute('aria-pressed', 'false')
   await expect(detailHeart).toBeEnabled()
-  expect((await admin.from('saved_places').select('*').eq('user_id', account.id)).data).toEqual([])
+  expect((await admin.schema('accounts').from('saved_places').select('*').eq('user_id', account.id)).data).toEqual([])
   // Unintercepted browser writes also exercise the real CORS preflight.
   await detailHeart.click()
   await expect(detailHeart).toHaveAttribute('aria-pressed', 'true')
@@ -211,7 +211,7 @@ test('account switch ignores an old pending save response and AI cards share hea
   await page.unrouteAll({ behavior: 'wait' })
   await expect(page.getByRole('heading', { name: 'Saved places (0)' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Odette', exact: true })).toHaveCount(0)
-  const { data: place } = await admin.from('places').select('*').eq('name', 'Odette').single()
+  const { data: place } = await admin.schema('catalog').from('places').select('*').eq('name', 'Odette').single()
   // Stub only the unrelated Gemini response; auth and saves still use real API/DB.
   await page.route('**/ask', (route) => route.fulfill({ json: {
     reply: 'Try Odette', places: [{ ...place, reason: 'A place to try', saved: false }],
@@ -272,7 +272,7 @@ test('a routine token refresh keeps unsaved survey answers and saved places', as
 
 test('auth callback opens the survey only for users without preferences', async ({ page }) => {
   const returning = await user()
-  expect((await admin.from('preferences').insert({ user_id: returning.id, tags: ['Cafe'] })).error).toBeNull()
+  expect((await admin.schema('accounts').from('preferences').insert({ user_id: returning.id, tags: ['Cafe'] })).error).toBeNull()
   await login(page, returning)
   await page.goto('/auth/callback')
   await expect(page).toHaveURL(/\/profile$/)

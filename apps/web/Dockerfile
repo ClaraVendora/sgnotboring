@@ -5,9 +5,14 @@
 FROM node:22-alpine AS base
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY apps/api/package.json apps/api/
+COPY apps/gateway/package.json apps/gateway/
+COPY apps/places/package.json apps/places/
+COPY apps/ask/package.json apps/ask/
+COPY apps/accounts/package.json apps/accounts/
+COPY apps/community/package.json apps/community/
 COPY apps/web/package.json apps/web/
 COPY packages/shared ./packages/shared
+COPY packages/service-kit ./packages/service-kit
 
 # ---- dev: source is bind-mounted by docker-compose, Vite HMR ----
 FROM base AS dev

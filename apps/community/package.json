@@ -1,0 +1,21 @@
+{
+  "name": "community",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "test:reviews:local": "RUN_LOCAL_REVIEWS_TEST=1 node --test src/routes/reviews.test.js src/services/reviews.integration.test.js",
+    "test:collections:local": "RUN_LOCAL_COLLECTIONS_TEST=1 node --test src/routes/collections.test.js src/services/collections.integration.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@sgnotboring/service-kit": "*",
+    "dotenv": "^17.4.2"
+  }
+}

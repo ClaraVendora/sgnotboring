@@ -32,8 +32,8 @@ Run:
 npm run dev
 npm run lint
 npm run build
-npm test -w api
-npm run test:auth:local -w api
+npm test -w accounts
+npm run test:auth:local -w accounts
 ```
 
 The last command uses a temporary `@example.com` account, consumes its local confirmation email, tests token refresh and revocation, and deletes the test account/email. It refuses hosted Supabase URLs. Other tests need no running database.

@@ -5,14 +5,14 @@ import { randomUUID } from 'node:crypto'
 import dotenv from 'dotenv'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:3001'
-const env = dotenv.parse(readFileSync(new URL('../../api/.env', import.meta.url)))
+const env = dotenv.parse(readFileSync(new URL('../../places/.env', import.meta.url)))
 if (!['http://127.0.0.1:54321', 'http://localhost:54321'].includes(env.SUPABASE_URL)) throw new Error('Local Supabase only')
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const users = []
 let places
 
 test.beforeAll(async () => {
-  const { data, error } = await admin.from('places').select('*').limit(2)
+  const { data, error } = await admin.schema('catalog').from('places').select('*').limit(2)
   expect(error).toBeNull()
   places = data
 })
@@ -71,7 +71,7 @@ test('Profile collections support persistent places, owner controls and public v
   }
   const ownerUrl = page.url()
   const id = new URL(ownerUrl).pathname.split('/').pop()
-  const { data } = await admin.from('collections').select('share_token').eq('id', id).single()
+  const { data } = await admin.schema('community').from('collections').select('share_token').eq('id', id).single()
   await page.reload()
   await expect(page.getByRole('list', { name: 'Places in collection' }).locator('li')).toHaveCount(2)
   const context = await browser.newContext()
@@ -173,15 +173,15 @@ test('Discover saves into chosen collections and Profile shows horizontal tiles'
   await expect(filledBookmark).toHaveAttribute('aria-pressed', 'true')
   await expect(picker).toHaveCount(0)
   await expect(page).toHaveURL(/\/$/)
-  const { data: collections } = await admin.from('collections').select('id,name').eq('user_id', user.id)
+  const { data: collections } = await admin.schema('community').from('collections').select('id,name').eq('user_id', user.id)
   const dinner = collections.find((collection) => collection.name === 'Dinner ideas')
   // Set up a second membership so one click must remove the place everywhere.
-  expect((await admin.from('collection_places').insert({ collection_id: dinner.id, place_id: places[0].id })).error).toBeNull()
+  expect((await admin.schema('community').from('collection_places').insert({ collection_id: dinner.id, place_id: places[0].id })).error).toBeNull()
   await page.reload()
   await expect(filledBookmark).toHaveAttribute('aria-pressed', 'true')
   await filledBookmark.click()
   await expect(trigger).toHaveAttribute('aria-pressed', 'false')
-  const { data: memberships } = await admin.from('collection_places').select('*').eq('place_id', places[0].id).in('collection_id', collections.map((collection) => collection.id))
+  const { data: memberships } = await admin.schema('community').from('collection_places').select('*').eq('place_id', places[0].id).in('collection_id', collections.map((collection) => collection.id))
   expect(memberships).toHaveLength(0)
   await expect(page.getByRole('button', { name: `Unsave ${places[0].name}`, exact: true })).toBeVisible()
   await trigger.click()
@@ -215,7 +215,7 @@ test('Discover picker handles guests, empty collections, failed loads and failed
   await page.unroute(`${API}/collections?*`)
   await picker.getByRole('button', { name: 'Retry collections' }).click()
   const choice = picker.getByRole('button', { name: 'Add to Retry picker', exact: true })
-  const { data } = await admin.from('collections').select('id').eq('user_id', user.id).single()
+  const { data } = await admin.schema('community').from('collections').select('id').eq('user_id', user.id).single()
   const endpoint = `${API}/collections/${data.id}/places/${places[0].id}`
   await page.route(endpoint, (route) => route.fulfill({ status: 500, json: { error: 'Unavailable' } }))
   await choice.click()

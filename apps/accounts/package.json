@@ -1,0 +1,21 @@
+{
+  "name": "accounts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "test:auth:local": "RUN_LOCAL_AUTH_TEST=1 node --test src/routes/me.test.js src/services/auth.integration.test.js",
+    "test:personalisation:local": "RUN_LOCAL_PERSONALISATION_TEST=1 node --test src/routes/personalisation.test.js src/services/personalisation.integration.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@sgnotboring/service-kit": "*",
+    "dotenv": "^17.4.2"
+  }
+}

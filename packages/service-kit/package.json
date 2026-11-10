@@ -1,0 +1,20 @@
+{
+  "name": "@sgnotboring/service-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./auth": "./auth.js",
+    "./client": "./client.js",
+    "./db": "./db.js",
+    "./llm": "./llm.js",
+    "./server": "./server.js",
+    "./vocabulary": "./vocabulary.js"
+  },
+  "scripts": { "test": "node --test" },
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "@supabase/supabase-js": "^2.116.0",
+    "fastify": "^5.12.3"
+  }
+}

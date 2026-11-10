@@ -1,29 +1,111 @@
-# Local development: API + web with hot reload.
+# Local development: gateway + four services + web, all with hot reload.
 # Supabase runs separately via the Supabase CLI (also Docker): `npm run db:start`.
+# Each service reads its own apps/<service>/.env (copy from .env.example).
 #
 #   docker compose up --build      # first run / after dependency changes
 #   docker compose up              # subsequent runs
 #   docker compose down            # stop
 
+x-service: &service
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
 services:
-  api:
+  gateway:
+    <<: *service
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/gateway/Dockerfile
       target: dev
     ports:
       - "3001:3001"
     env_file:
-      - apps/api/.env
+      - apps/gateway/.env
     environment:
       HOST: 0.0.0.0
+      PLACES_URL: http://places:3011
+      ASK_URL: http://ask:3012
+      ACCOUNTS_URL: http://accounts:3013
+      COMMUNITY_URL: http://community:3014
+    volumes:
+      - ./apps/gateway/src:/app/apps/gateway/src
+    depends_on: [places, ask, accounts, community]
+
+  places:
+    <<: *service
+    build:
+      context: .
+      dockerfile: apps/places/Dockerfile
+      target: dev
+    env_file:
+      - apps/places/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3011
       # Reach the host machine's Supabase from inside the container
       SUPABASE_URL: http://host.docker.internal:54321
     volumes:
-      - ./apps/api/src:/app/apps/api/src
+      - ./apps/places/src:/app/apps/places/src
+      - ./packages/service-kit:/app/packages/service-kit
       - ./packages/shared:/app/packages/shared
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+
+  ask:
+    <<: *service
+    build:
+      context: .
+      dockerfile: apps/ask/Dockerfile
+      target: dev
+    env_file:
+      - apps/ask/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3012
+      # Reach the host machine's Supabase from inside the container
+      SUPABASE_URL: http://host.docker.internal:54321
+      PLACES_URL: http://places:3011
+      ACCOUNTS_URL: http://accounts:3013
+    volumes:
+      - ./apps/ask/src:/app/apps/ask/src
+      - ./packages/service-kit:/app/packages/service-kit
+      - ./packages/shared:/app/packages/shared
+
+  accounts:
+    <<: *service
+    build:
+      context: .
+      dockerfile: apps/accounts/Dockerfile
+      target: dev
+    env_file:
+      - apps/accounts/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3013
+      # Reach the host machine's Supabase from inside the container
+      SUPABASE_URL: http://host.docker.internal:54321
+      PLACES_URL: http://places:3011
+    volumes:
+      - ./apps/accounts/src:/app/apps/accounts/src
+      - ./packages/service-kit:/app/packages/service-kit
+      - ./packages/shared:/app/packages/shared
+
+  community:
+    <<: *service
+    build:
+      context: .
+      dockerfile: apps/community/Dockerfile
+      target: dev
+    env_file:
+      - apps/community/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3014
+      # Reach the host machine's Supabase from inside the container
+      SUPABASE_URL: http://host.docker.internal:54321
+      PLACES_URL: http://places:3011
+    volumes:
+      - ./apps/community/src:/app/apps/community/src
+      - ./packages/service-kit:/app/packages/service-kit
+      - ./packages/shared:/app/packages/shared
 
   web:
     build:
@@ -43,4 +125,4 @@ services:
       - ./apps/web/vite.config.js:/app/apps/web/vite.config.js
       - ./apps/web/public:/app/apps/web/public
     depends_on:
-      - api
+      - gateway

@@ -1,7 +1,8 @@
 # sgnotboring
 
 Singapore Discovery Hub: AI-curated food & experiences for young Singaporeans. Monorepo:
-`apps/web` (React + Vite + Chakra UI v3, port 3000) and `apps/api` (Fastify, port 3001), Supabase Postgres.
+`apps/web` (React + Vite + Chakra UI v3, port 3000) and four Fastify microservices behind `apps/gateway`
+(port 3001), Supabase Postgres with one schema per service.
 See README.md for setup and environments.
 
 ## Hard constraints
@@ -47,16 +48,20 @@ apps/web/src/
   lib/api.js       the ONLY place fetch() is called. One exported function per endpoint.
   lib/*.js         pure helpers (hours.js). No React imports.
 
-apps/api/src/
-  server.js        Fastify instance, CORS, plugin registration. Add new route files here.
-  routes/<resource>.js   one Fastify plugin per resource (places.js). Thin handlers: validate via
+apps/gateway/src/
+  routes.js        path → owning service. A new public route needs a rule here. CORS lives here only.
+apps/<service>/src/        places (catalog schema), ask (no tables), accounts (accounts), community (community)
+  server.js        startService() from service-kit + plugin registration. Add new route files here.
+  routes/<resource>.js   one Fastify plugin per resource. Thin handlers: validate via
                    schema → call service → shape response. Errors: `reply.code(n).send({ error })`.
-  services/        outside-world clients (supabase.js, llm.js = Gemini, tags.js = cached vocabulary).
-                   No Fastify objects, so scripts can import them.
-  hooks/           Fastify route hooks (require-user.js = `preHandler` that sets `request.user` or
-                   replies 401/503). Token verification itself stays in services/auth.js.
-  prompts/         LLM system prompts + JSON schemas, pure functions (tagging.js, ask.js).
-  scripts/         runnable jobs: `node src/scripts/<name>.js` (enrich.js = LLM tagging; ingest goes here).
+  routes/internal.js     service-to-service endpoints under /internal/* (the gateway never forwards them).
+  services/        data access + outside-world clients. No Fastify objects, so scripts can import them.
+  clients.js       HTTP clients for other services (createServiceClient). Never query another schema.
+  prompts/         LLM system prompts + JSON schemas, pure functions (places: tagging.js; ask: ask.js).
+  scripts/         places only: `node src/scripts/<name>.js` (ingest.js = SerpApi import, enrich.js = LLM tagging).
+packages/service-kit/   db.js (createDb(schema)), auth.js (token check + require/optional user preHandlers),
+                   llm.js (Gemini), client.js (service-to-service HTTP), server.js, vocabulary.js.
+packages/shared/   hours logic shared by web and services.
 
 supabase/migrations/   schema, forward-only, additive (add now, drop in a later PR).
 supabase/seed.sql      local sample data only.
@@ -76,6 +81,9 @@ supabase/seed.sql      local sample data only.
 - `WEB_ORIGIN` (api) must exactly equal the browser's origin, no trailing slash.
 - Tag filter is any-of (`overlaps`). `contains` would make it all-of.
 - `opening_hours` is raw Google JSON; `lib/hours.js` derives open/closed from `periods` in SG time.
-- Data flows `raw_places` → (trigger) → `places`. Write raw payloads, never normalized columns, directly.
+- Data flows `catalog.raw_places` → (trigger) → `catalog.places`. Write raw payloads, never normalized columns, directly.
+- A service's Supabase client is pinned to its own schema (`createDb('<schema>')`). Need another service's data?
+  Call its `/internal/*` endpoint through `clients.js`. No foreign keys across schemas.
+- Hosted Supabase must list `catalog`, `accounts`, `community` under Data API → Exposed schemas (a new schema too).
 - Tags must exist in the `tags` table (vocabulary changes are migrations). LLM output is enum-constrained to it.
 - Gemini free-tier quota is per Google Cloud project: separate AI Studio project/key per environment.

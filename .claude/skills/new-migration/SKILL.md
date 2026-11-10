@@ -11,6 +11,11 @@ Create a migration: `$ARGUMENTS` (snake_case, describes the change: `add_places_
 - **Forward-only and additive.** There is no rollback. Add columns/tables now; drop or rename in a *later* PR after the code stops using the old shape, because Railway deploys the app in parallel with the migration.
 - Idempotent where cheap (`if not exists`, `drop ... if exists` before `create policy/trigger`).
 - New tables: enable RLS and add an explicit read policy (see `20260911000000_create_places.sql`). Writes go through the service role key, so no write policies for `anon`.
+- **Put objects in the owning service's schema** (`catalog` = Places, `accounts` = Accounts, `community` =
+  Community) and always schema-qualify names (`create table community.x`). No foreign keys or function reads
+  across schemas; a reference to another service's row is a plain id the service checks over HTTP.
+  A brand-new schema also needs `grant usage`, `config.toml` `[api] schemas`, and the hosted Data API
+  *Exposed schemas* setting on both projects (call that out in the PR).
 - Migrations are applied to staging/prod automatically by CI on merge (`migrate` job).
 
 ## Steps

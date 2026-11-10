@@ -71,7 +71,7 @@ export async function searchGoogleMaps({
   fetchImpl = fetch,
 } = {}) {
   if (!apiKey?.trim() || /^(paste-|your-)/i.test(apiKey)) {
-    throw new Error('Set SERPAPI_KEY in apps/api/.env before importing places.')
+    throw new Error('Set SERPAPI_KEY in apps/places/.env before importing places.')
   }
   if (!Array.isArray(queries) || !queries.length || queries.some((q) => typeof q !== 'string' || !q.trim() || q.length > 500)) {
     throw new Error('Query must contain 1–500 characters.')

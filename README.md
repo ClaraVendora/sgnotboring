@@ -4,8 +4,8 @@ A centralized discovery hub for young Singaporeans: high-confidence, AI-curated
 details for local food and experiences, so you don't have to cross-reference five apps.
 
 **Stack:** pure JavaScript (no TypeScript) · Turborepo + npm workspaces ·
-React + Vite + Chakra UI (`apps/web`, port 3000) · Fastify (`apps/api`, port 3001) ·
-Supabase (Postgres + Auth) · Docker · Railway.
+React + Vite + Chakra UI (`apps/web`, port 3000) · four Fastify microservices behind a gateway
+(`apps/gateway`, port 3001; see §6) · Supabase (Postgres + Auth, one schema per service) · Docker · Railway.
 
 ---
 
@@ -22,26 +22,25 @@ Supabase (Postgres + Auth) · Docker · Railway.
 ```bash
 git clone <repo-url> sgnotboring && cd sgnotboring
 npm install                              # installs all workspaces + turbo + supabase CLI
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
+for app in gateway places ask accounts community web; do cp apps/$app/.env.example apps/$app/.env; done
 npm run db:start                         # boots local Supabase in Docker (first run pulls images, ~2-3 min)
 ```
 
-`npm run db:start` prints your local keys. Paste them into the two `.env` files:
+`npm run db:start` prints your local keys. Paste them into the `.env` files:
 
 | Printed by `db:start` | Put it in |
 |---|---|
-| `API URL` (http://127.0.0.1:54321) | `SUPABASE_URL` (api) and `VITE_SUPABASE_URL` (web) |
-| `anon key` | `SUPABASE_ANON_KEY` (api) and `VITE_SUPABASE_ANON_KEY` (web) |
-| `service_role key` | `SUPABASE_SERVICE_ROLE_KEY` (api only, never the browser) |
+| `API URL` (http://127.0.0.1:54321) | `SUPABASE_URL` (places, ask, accounts, community) and `VITE_SUPABASE_URL` (web) |
+| `anon key` | `SUPABASE_ANON_KEY` (ask, accounts, community) and `VITE_SUPABASE_ANON_KEY` (web) |
+| `service_role key` | `SUPABASE_SERVICE_ROLE_KEY` (places, accounts, community; never the browser) |
 
 Run `npm run db:status` any time to see them again. Studio (DB GUI) is at http://127.0.0.1:54323.
 
-For the Ask tab, also set `GEMINI_API_KEY` in `apps/api/.env` (free key from
+For the Ask tab, also set `GEMINI_API_KEY` in `apps/ask/.env` and `apps/places/.env` (free key from
 [Google AI Studio](https://aistudio.google.com/apikey)), then tag the seed places once:
 
 ```bash
-npm run enrich -w api    # LLM-tags every pending place (~7 Gemini calls for the seed data)
+npm run enrich -w places    # LLM-tags every pending place (~7 Gemini calls for the seed data)
 ```
 
 `npm run db:reset` wipes the tags, so re-run `enrich` after a reset.
@@ -51,21 +50,21 @@ npm run enrich -w api    # LLM-tags every pending place (~7 Gemini calls for the
 ### Option A — plain Node (fastest feedback loop)
 
 ```bash
-npm run dev            # both apps via turbo
-npm run dev:api        # only the API  → http://localhost:3001/health
-npm run dev:web        # only the web  → http://localhost:3000
+npm run dev            # gateway, four services and web via turbo
+npm run dev:services   # only the backend → http://localhost:3001/health (gateway)
+npm run dev:web        # only the web     → http://localhost:3000
 ```
 
 ### Option B — Docker containers (matches production images)
 
 ```bash
-npm run docker:up      # = docker compose up --build  (api + web, hot reload)
+npm run docker:up      # = docker compose up --build  (gateway + 4 services + web, hot reload)
 npm run docker:down
 ```
 
 Source folders are bind-mounted so edits hot-reload inside the containers.
 Re-run with `--build` after changing any `package.json`.
-Inside the containers the API reaches Supabase at `host.docker.internal:54321`
+Inside the containers the services reach Supabase at `host.docker.internal:54321`
 (already set in `docker-compose.yml`); the browser still uses `localhost`.
 
 ### Local Supabase
@@ -86,12 +85,13 @@ npm run db:migrate <name>   # create supabase/migrations/<ts>_<name>.sql
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | api + web with hot reload |
+| `npm run dev` | gateway, services and web with hot reload |
+| `npm test` | unit tests for every service and shared package |
 | `npm run build` | production build of every workspace |
 | `npm run lint` | oxlint on the web app |
 | `npm run docker:up` / `docker:down` | local containers |
 | `npm run db:*` | local Supabase (see above) |
-| `npm run enrich -w api` | LLM-tag pending places (`-- --retag` re-tags all, `-- --dry-run` writes nothing) |
+| `npm run enrich -w places` | LLM-tag pending places (`-- --retag` re-tags all, `-- --dry-run` writes nothing) |
 | `npm run db:push:staging` / `db:push:prod` | apply migrations to a hosted project |
 
 ---
@@ -123,26 +123,41 @@ feature/*  ──PR──▶  staging  ──PR──▶  main
 
 | | Branch | Web | API | Supabase project |
 |---|---|---|---|---|
-| **local** | any | http://localhost:3000 | http://localhost:3001 | CLI in Docker (`npm run db:start`) |
+| **local** | any | http://localhost:3000 | http://localhost:3001 (gateway) | CLI in Docker (`npm run db:start`) |
 | **staging** | `staging` | https://web-staging-678b.up.railway.app | Railway → `staging` env → `api` | `sg-not-boring-staging` (`pyaqltngppzgcodojita`) |
 | **production** | `main` | https://web-production-543a7.up.railway.app | https://api-production-71f5.up.railway.app | `sg-not-boring` (`pnzjujwgvycdriwomwew`) |
 
-Both apps deploy to Railway as Docker images built from the repo root; each app's `railway.json`
+Every app deploys to Railway as a Docker image built from the repo root; each app's `railway.json`
 sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generated domains are used, no custom domain.
+Each environment has six services: `web` and `api` are public; `places`, `ask`, `accounts` and `community` have
+**no public domain** and are reached by the gateway over Railway's private network. The `api` service runs
+`apps/gateway` (config path `apps/gateway/railway.json`), so the public API URL did not change.
 
 **Variables** live in Railway per service and per environment:
 
-- `api`: `PORT`, `WEB_ORIGIN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-  `GEMINI_API_KEY`, `GEMINI_MODEL` (Gemini free-tier quota is per Google Cloud project, so give each
-  environment its own AI Studio project and key)
-- `web`: `PORT`, `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+| Service | Variables |
+|---|---|
+| `api` (gateway) | `PORT`, `WEB_ORIGIN`, `PLACES_URL`, `ASK_URL`, `ACCOUNTS_URL`, `COMMUNITY_URL` |
+| `places` | `PORT=3011`, `HOST=::`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `ask` | `PORT=3012`, `HOST=::`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `PLACES_URL`, `ACCOUNTS_URL` |
+| `accounts` | `PORT=3013`, `HOST=::`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `PLACES_URL` |
+| `community` | `PORT=3014`, `HOST=::`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `PLACES_URL` |
+| `web` | `PORT`, `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+Service URLs use Railway references, e.g. `PLACES_URL=http://${{places.RAILWAY_PRIVATE_DOMAIN}}:${{places.PORT}}`.
+`HOST=::` lets the private network (IPv6) reach a service. `SUPABASE_ANON_KEY` is only used to verify login
+tokens. Gemini free-tier quota is per Google Cloud project, so give each environment its own AI Studio project and key.
 
 **Gotchas**
 
 - `VITE_*` values are baked in at **build** time. After changing one, redeploy `web`.
 - `WEB_ORIGIN` and `VITE_API_URL` reference the other service's domain (`${{web.RAILWAY_PUBLIC_DOMAIN}}` / `${{api.RAILWAY_PUBLIC_DOMAIN}}`).
   If the web page reports a CORS error after a fresh setup, redeploy `api` so the reference re-resolves.
-- Adding a new env var: put it in `.env.example`, then in Railway for **both** environments.
+- Adding a new env var: put it in the service's `.env.example`, then in Railway for **both** environments.
+- The service schemas (`catalog`, `accounts`, `community`) must be listed in each hosted Supabase project under
+  **Settings → Data API → Exposed schemas**. That is a Data API setting, not part of the database, so migrations
+  can't set it (locally it is `[api] schemas` in `supabase/config.toml`). A missing schema shows up as errors from
+  every service.
 - Migrations are applied **automatically by CI** on every push to `staging` / `main` (the `migrate` job,
   after `build` passes). Its secrets, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, live in the GitHub
   Environments `staging` and `production`, which only the `staging` and `main` branches can use.
@@ -150,19 +165,38 @@ sets its Dockerfile, `/health` check, and rebuild watch paths. Railway's generat
 - Migrations are forward-only. Test with `npm run db:reset` locally, let them soak on staging, and keep them
   additive (add now, drop later) since Railway deploys the app in parallel with the migration.
 
-## 6. Repo layout
+## 6. Architecture and repo layout
+
+The backend is four microservices behind one gateway. Each service owns one Postgres schema in the same
+Supabase project, and only reaches another service's data over HTTP.
+
+| Service | Folder, local port | Public routes (via the gateway) | Owns | Calls |
+|---|---|---|---|---|
+| Gateway | `apps/gateway`, 3001 | everything below; refuses `/internal/*` | nothing | all four |
+| Places | `apps/places`, 3011 | `GET /places`, `GET /places/:id`, `GET /tags` | `catalog`: places, tags, raw_places | nobody |
+| AI search | `apps/ask`, 3012 | `POST /ask` | nothing (stateless) | Places, Accounts, Gemini |
+| Accounts | `apps/accounts`, 3013 | `/me`, `/me/preferences*`, `/me/saved-places*` | `accounts`: preferences, saved_places | Places |
+| Community | `apps/community`, 3014 | `/collections*`, `/places/:id/review(s)`, `/me/reviews*` | `community`: collections, collection_places, place_reviews | Places |
+
+- The gateway checks CORS and forwards each request, including the `Authorization` header, unchanged. Every
+  service verifies the user itself with Supabase Auth.
+- Services call each other on `/internal/*` routes (Places: vocabulary, candidate search, next opening, batch
+  lookup by id; Accounts: a user's survey tags and saved place ids). The gateway never forwards these.
+- There are no foreign keys between schemas. Accounts and Community check that a place exists by asking Places.
+- Each service's Supabase client is pinned to its own schema. All services use the same service role key, so
+  that isolation is by convention, not enforced by the database.
+- Login (sign up, sign in, profile updates) goes from the browser straight to Supabase Auth.
 
 ```
 apps/
-  api/                  Fastify backend
-    src/routes/         health.js, places.js (GET /places, /places/:id, /tags), ask.js (POST /ask), me.js (account/preferences/saves)
-    src/services/       supabase.js, auth.js (verified user), llm.js (Gemini), tags.js (tag vocabulary)
-    src/hooks/          require-user.js (protected endpoint pre-handler)
-    src/prompts/        LLM system prompts + JSON schemas (tagging, /ask interpret + rank)
-    src/scripts/        enrich.js (LLM tagging job)
-    src/server.js       entry point
-    Dockerfile          dev + prod stages
-    railway.json
+  gateway/              public entry point: CORS + path → service routing (src/routes.js)
+  places/               catalogue: routes/places.js, routes/internal.js, services/ (browse, candidate search,
+                        tag vocabulary, SerpApi client), prompts/tagging.js, scripts/ (ingest.js, enrich.js)
+  ask/                  AI search: routes/ask.js, clients.js (Places + Accounts), services/ (personalisation,
+                        open-now, no-match), prompts/ask.js
+  accounts/             routes/me.js, routes/internal.js, services/ (preferences, saved-places)
+  community/            routes/collections.js, routes/reviews.js, services/ (collections, reviews)
+    each service:       src/server.js, Dockerfile (dev + prod stages), railway.json, .env.example
   web/                  React + Vite + Chakra UI
     src/App.jsx         routes: / · /ask · /profile · /onboarding · /auth/callback · /places/:id · * + bottom tab bar
     src/pages/          Home (tag filter via ?tags=), Ask (chat search), Profile, Onboarding, PlaceDetail, NotFound
@@ -171,9 +205,13 @@ apps/
     Dockerfile          dev + build + nginx prod stages
     nginx/              SPA config, listens on $PORT
     railway.json
+packages/
+  service-kit/          shared by the services: db.js (schema-pinned Supabase client), auth.js (token check +
+                        preHandlers), llm.js (Gemini), client.js (service-to-service HTTP), server.js, vocabulary.js
+  shared/               opening-hours logic used by web, Places and AI search
 supabase/
   config.toml           local Supabase config
-  migrations/           schema (places, tags vocabulary, raw_places + normalize trigger, search_places(), browse_places())
+  migrations/           schema; split_service_schemas moves tables into catalog / accounts / community
   seed.sql              local sample data: 64 places into raw_places
 docker-compose.yml      local dev containers
 turbo.json              dev / build / lint pipelines
@@ -206,7 +244,7 @@ zero on desktop (SGN-005).
 | `/places/:id` | PlaceDetail | one place |
 | `*` | NotFound | |
 
-Tag filtering matches places that have **any** of the selected tags (`overlaps` in `routes/places.js`; change to `contains` for all-of).
+Tag filtering matches places that have **any** of the selected tags (`&&` in `catalog.browse_places()`; change to `@>` for all-of).
 
 ### Collections
 
@@ -246,7 +284,7 @@ The additive migration is `20261104152905_create_collections.sql`; no new env va
 
 ```bash
 npx supabase migration up --local
-npm run test:collections:local -w api
+npm run test:collections:local -w community
 npm run test:e2e:local -w web -- e2e/collections.spec.js
 ```
 
@@ -282,7 +320,7 @@ For an existing local database, apply pending migrations without resetting data:
 
 ```bash
 npx supabase migration up --local
-npm run test:reviews:local -w api
+npm run test:reviews:local -w community
 npm run test:e2e:local -w web -- e2e/reviews.spec.js
 ```
 
@@ -295,7 +333,7 @@ See [Auth setup and acceptance checks](docs/auth-setup.md). Email confirmation i
 open http://127.0.0.1:54324 to receive test messages. After changing local Auth settings, stop/start
 Supabase without resetting the database. Hosted staging/production need separate Dashboard configuration.
 `GET /me` verifies the Supabase JWT and returns only the current user's identity; guest discovery remains public.
-Run `npm test -w api` for unit tests and `npm run test:auth:local -w api` for the opt-in local email/token workflow.
+Run `npm test` for unit tests and `npm run test:auth:local -w accounts` for the opt-in local email/token workflow.
 
 Account → **Edit profile** updates the display name, email, and a preset profile
 icon (initials, animals, or food icons). Name/icon changes are saved in the user's
@@ -342,17 +380,17 @@ cards with a count and empty state. Authenticated state is discarded on account 
 | `DELETE /me/saved-places/:id` | Idempotent removal |
 
 All `/me/*` routes require a verified, confirmed Supabase user. Ownership comes from the
-JWT, never a supplied user ID. `GET /places`, `GET /places/:id` and `POST /ask` include
-`saved` flags; guests receive `false`. A supplied invalid token returns 401 rather than
-falling back to guest mode. User-specific responses use `Cache-Control: no-store`.
-Both new tables have owner RLS and cascading foreign keys. `No pork` and `Family Friendly`
+JWT, never a supplied user ID. The web app keeps the saved list itself, so `GET /places`,
+`GET /places/:id` and `POST /ask` no longer include `saved` flags. User-specific responses use
+`Cache-Control: no-store`.
+Both tables (now in the `accounts` schema) have owner RLS and cascade on user deletion. `No pork` and `Family Friendly`
 are added by `20261026031535_create_preferences_and_saved_places.sql`.
 No new environment variables. AI Search uses them through the Personalised toggle (SGN-012, below).
 
 With local Supabase and both dev servers running and `.env` configured:
 
 ```sh
-npm run test:personalisation:local -w api  # real JWTs, two users, direct RLS and API checks
+npm run test:personalisation:local -w accounts  # real JWTs, two users, direct RLS and API checks
 npx playwright install chromium         # one-time browser install
 npm run test:e2e:local -w web             # signup, skip/edit, hearts, failures and account switch; AI Search recovery,
                                           # conversation and Personalised (/ask stubbed). E2E_BASE_URL / E2E_API_URL change ports
@@ -368,17 +406,17 @@ auth tokens. Full scope and acceptance evidence: [SGN-014/015 notes](docs/kejia-
 
 ### Import Google Maps places
 
-Set `SERPAPI_KEY` in `apps/api/.env` to your [SerpApi key](https://serpapi.com/manage-api-key).
+Set `SERPAPI_KEY` in `apps/places/.env` to your [SerpApi key](https://serpapi.com/manage-api-key).
 The importer uses [SerpApi's Google Maps search](https://serpapi.com/google-maps-api),
 not a Google Cloud Places API key. Keep this key server-side.
 
 ```bash
-npm run ingest -w api -- --query "food places in Singapore" --limit 20
+npm run ingest -w places -- --query "food places in Singapore" --limit 20
 # Other searches: --query "cafes in Bugis" or --query "things to do in Sentosa"
 # Larger import across categories, capped at six requests total:
-npm run ingest -w api -- --query "hawker food in Singapore" --query "restaurants in Singapore" --query "cafes in Singapore" --limit 120 --max-requests 6
+npm run ingest -w places -- --query "hawker food in Singapore" --query "restaurants in Singapore" --query "cafes in Singapore" --limit 120 --max-requests 6
 # Preview without database writes (still uses SerpApi search credits):
-npm run ingest -w api -- --query "cafes in Bugis" --limit 5 --dry-run
+npm run ingest -w places -- --query "cafes in Bugis" --limit 5 --dry-run
 ```
 
 The default target is 20 unique Singapore places. Increase `--limit` (up to 1200)
@@ -409,7 +447,7 @@ The host command uses `SUPABASE_URL=http://127.0.0.1:54321` from the API `.env`.
 The API containers keep using the host gateway configured in `docker-compose.yml`.
 
 New places display immediately without Gemini. To include them in tag filtering and Ask,
-set `GEMINI_API_KEY` separately, then run `npm run enrich -w api`.
+set `GEMINI_API_KEY` separately, then run `npm run enrich -w places`.
 
 Imports also save the Maps result's thumbnail as `places.photo_url`. Browse cards and
 place details show it as a cover image, with the SG not boring default image for missing or broken photos.
@@ -421,10 +459,10 @@ These are external image URLs, so availability and resolution depend on the prov
 
 ### Sharing with teammates
 
-`docker compose up --build` starts the web app and our Fastify API. Starting them or
+`docker compose up --build` starts the web app, the gateway and the four services. Starting them or
 viewing places reads Supabase; it does **not** run the importer or call SerpApi.
-Only an explicit `npm run ingest -w api` command calls SerpApi, using the key in
-that person's `apps/api/.env`. The Ask feature calls Gemini separately.
+Only an explicit `npm run ingest -w places` command calls SerpApi, using the key in
+that person's `apps/places/.env`. The Ask feature calls Gemini separately.
 
 Local Supabase databases are separate on each computer: imported rows are not included
 in Git. Teammates can import into their own local database, or use a shared hosted
@@ -437,18 +475,18 @@ teammates must configure their own environment files.
 
 ```
 raw_places insert ──trigger──▶ places (name, hours, price, …)      status 'pending'
-npm run enrich -w api ──▶ Gemini (batches of 10) ──▶ places.tags + summary, status 'done'
+npm run enrich -w places ──▶ Gemini (batches of 10) ──▶ places.tags + summary, status 'done'
 
 POST /ask { message, history, personalised? }
   0. "ignore your instructions…"-style messages get a fixed refusal, no Gemini call
   1. Gemini "interpret" → must_tags (all required), want_tags (scored), count (default 3)
-  2. search_places() SQL function → up to 20 candidates; loosens filters if too few
+  2. Places service (catalog.search_places()) → up to 20 candidates; loosens filters if too few
   3. Gemini "rank" → top `count` with a one-line reason each (falls back to search order on error)
 ```
 
 - Tags come only from the `tags` table (65 tags in 10 facets incl. 20 areas). Both prompts pass them as a JSON
   Schema `enum`, so the model can't invent tags. Change the vocabulary with a migration, then `enrich -- --retag`.
-- Budget, Late Night, Outdoor Seating and Pet Friendly are derived from Google's data in code (`prompts/tagging.js`), not by the LLM.
+- Budget, Late Night, Outdoor Seating and Pet Friendly are derived from Google's data in code (`apps/places/src/prompts/tagging.js`), not by the LLM.
 - Default model is `gemini-3.1-flash-lite` (free tier). Each `/ask` costs 2 calls.
 
 ## 9. Browse and search (SGN-001 / SGN-002)
@@ -520,7 +558,7 @@ Run the focused checks without external services:
 ```sh
 npm run test -w @sgnotboring/shared
 node --test apps/web/src/lib/place-card.test.js
-npm run test -w api
+npm test
 npm run lint
 npm run build
 ```

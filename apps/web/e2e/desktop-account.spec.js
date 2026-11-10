@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
 const API = process.env.E2E_API_URL ?? 'http://localhost:3001'
-const env = Object.fromEntries(readFileSync(new URL('../../api/.env', import.meta.url), 'utf8')
+const env = Object.fromEntries(readFileSync(new URL('../../places/.env', import.meta.url), 'utf8')
   .split('\n').filter((line) => /^[A-Z_]+=/.test(line))
   .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))
 if (!['http://127.0.0.1:54321', 'http://localhost:54321'].includes(env.SUPABASE_URL)) throw new Error('Local Supabase only')
@@ -102,9 +102,9 @@ test('resizing switches navigation without losing Ask draft, conversation or act
 test('Account profile, preferences, compact saved list and logout work at all target widths', async ({ page }, info) => {
   const user = await account('Kejia Test with a long display name for narrow screens')
   const tags = ['Cafe', 'Budget', 'Vegetarian Friendly', 'No pork', 'Family Friendly']
-  expect((await admin.from('preferences').insert({ user_id: user.id, tags })).error).toBeNull()
+  expect((await admin.schema('accounts').from('preferences').insert({ user_id: user.id, tags })).error).toBeNull()
   const places = await (await fetch(`${API}/places`)).json()
-  expect((await admin.from('saved_places').insert(places.slice(0, 2).map((place) =>
+  expect((await admin.schema('accounts').from('saved_places').insert(places.slice(0, 2).map((place) =>
     ({ user_id: user.id, place_id: place.id })))).error).toBeNull()
   await login(page, user)
   const profile = page.getByRole('region', { name: 'Your profile' })
@@ -184,7 +184,7 @@ test('Account errors are local to each section, recover on Retry, and logout fai
 test('Account loading states never show a false empty list, and logout remains usable', async ({ page }) => {
   const user = await account()
   // Finishing the survey with nothing selected stores an empty answer.
-  expect((await admin.from('preferences').insert({ user_id: user.id, tags: [] })).error).toBeNull()
+  expect((await admin.schema('accounts').from('preferences').insert({ user_id: user.id, tags: [] })).error).toBeNull()
   let release
   const gate = new Promise((resolve) => { release = resolve })
   for (const endpoint of ['/me', '/me/preferences', '/me/saved-places']) {

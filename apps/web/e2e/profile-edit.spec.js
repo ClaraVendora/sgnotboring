@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import dotenv from 'dotenv'
 
-const env = dotenv.parse(readFileSync(new URL('../../api/.env', import.meta.url)))
+const env = dotenv.parse(readFileSync(new URL('../../places/.env', import.meta.url)))
 if (!['http://127.0.0.1:54321', 'http://localhost:54321'].includes(env.SUPABASE_URL)) throw new Error('Local Supabase only')
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 const users = []

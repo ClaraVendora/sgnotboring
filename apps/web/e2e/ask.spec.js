@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 // toggle (SGN-012). /ask is stubbed, so no Gemini quota is used; place details and logins
 // use the local API and Supabase.
 const API = process.env.E2E_API_URL ?? 'http://localhost:3001'
-const env = Object.fromEntries(readFileSync(new URL('../../api/.env', import.meta.url), 'utf8')
+const env = Object.fromEntries(readFileSync(new URL('../../places/.env', import.meta.url), 'utf8')
   .split('\n').filter((line) => /^[A-Z_]+=/.test(line)).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))
 if (!['http://127.0.0.1:54321', 'http://localhost:54321'].includes(env.SUPABASE_URL)) throw new Error('E2E requires local Supabase')
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {

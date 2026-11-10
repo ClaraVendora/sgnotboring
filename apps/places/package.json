@@ -1,0 +1,22 @@
+{
+  "name": "places",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "enrich": "node src/scripts/enrich.js",
+    "ingest": "node src/scripts/ingest.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@sgnotboring/service-kit": "*",
+    "@sgnotboring/shared": "*",
+    "dotenv": "^17.4.2"
+  }
+}

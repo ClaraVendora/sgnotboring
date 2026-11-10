@@ -2,17 +2,18 @@
   "name": "sgnotboring",
   "private": true,
   "version": "0.1.0",
-  "description": "Singapore Discovery Hub (MVP) \u2014 AI-curated food & experiences for young Singaporeans",
+  "description": "Singapore Discovery Hub (MVP) — AI-curated food & experiences for young Singaporeans",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev": "turbo run dev",
-    "dev:api": "npm run dev -w api",
+    "dev:services": "turbo run dev --filter=gateway --filter=places --filter=ask --filter=accounts --filter=community",
     "dev:web": "npm run dev -w web",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "npm test -w packages/service-kit -w packages/shared -w gateway -w places -w ask -w accounts -w community",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "db:start": "supabase start",

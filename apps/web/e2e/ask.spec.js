@@ -209,7 +209,7 @@ test('switching tabs keeps the conversation and unsent draft; a pending reply la
   await expect(page.getByText('Finding places…')).toBeVisible()
   await page.getByRole('link', { name: 'Discover', exact: true }).click()
   release()
-  await expect(page.getByRole('heading', { name: 'Places to explore' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Places to visit' })).toBeVisible()
   await page.getByRole('link', { name: 'Ask', exact: true }).click()
   await expect(page.getByText('Background reply.')).toBeVisible()
   await expect(page.getByText('Finding places…')).toHaveCount(0)

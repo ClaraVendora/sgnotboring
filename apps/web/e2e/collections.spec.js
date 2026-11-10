@@ -45,8 +45,15 @@ async function create(page, name) {
   await card.getByRole('link', { name, exact: true }).click()
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
 }
+// Mimics GET /places: Home's paged list (?limit=) gets { places, total }, search gets the plain array.
+async function stubPlaces(page) {
+  await page.route(`${API}/places?*`, (route) => {
+    const paged = new URL(route.request().url()).searchParams.has('limit')
+    return route.fulfill({ json: paged ? { places, total: places.length } : places })
+  })
+}
 async function stubSearch(page) {
-  await page.route(`${API}/places?*`, (route) => route.fulfill({ json: places }))
+  await stubPlaces(page)
   await page.getByRole('button', { name: 'Add places', exact: true }).click()
 }
 
@@ -150,7 +157,7 @@ test('Discover saves into chosen collections and Profile shows horizontal tiles'
   expect(boxes[0].y).toBe(boxes[1].y)
   expect(await tiles.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await page.route(`${API}/places?*`, (route) => route.fulfill({ json: places }))
+  await stubPlaces(page)
   await page.goto('/')
   const trigger = page.getByRole('button', { name: `Add ${places[0].name} to a collection`, exact: true })
   const filledBookmark = page.getByRole('button', { name: `Remove ${places[0].name} from all collections`, exact: true })
@@ -187,7 +194,7 @@ test('Discover saves into chosen collections and Profile shows horizontal tiles'
 })
 
 test('Discover picker handles guests, empty collections, failed loads and failed adds', async ({ page }) => {
-  await page.route(`${API}/places?*`, (route) => route.fulfill({ json: places }))
+  await stubPlaces(page)
   await page.goto('/')
   const trigger = page.getByRole('button', { name: `Add ${places[0].name} to a collection`, exact: true })
   await trigger.click()
